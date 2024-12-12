@@ -35,26 +35,10 @@ export default function LoginForm() {
 
     try {
       setGoogleLoading(true);
-
-      // Check if popups are blocked
-      const popupTest = window.open('', '_blank', 'width=1,height=1');
-      if (!popupTest) {
-        toast.error(
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
-              <span>Popup was blocked</span>
-            </div>
-            <p className="text-sm">Please allow popups for this site and try again.</p>
-          </div>,
-          { duration: 5000 }
-        );
-        return;
-      }
-      popupTest.close();
-
       await signInWithGoogle();
+      toast.success('Successfully signed in with Google');
     } catch (error: any) {
+      console.error('Google sign in error:', error);
       if (error.code === 'auth/popup-blocked') {
         toast.error(
           <div className="flex flex-col gap-2">
@@ -66,10 +50,7 @@ export default function LoginForm() {
           </div>,
           { duration: 5000 }
         );
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        // User closed the popup, no need to show error
-        return;
-      } else {
+      } else if (error.code !== 'auth/popup-closed-by-user') {
         toast.error('Failed to sign in with Google');
       }
     } finally {

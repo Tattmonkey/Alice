@@ -6,6 +6,8 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
@@ -19,6 +21,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (data: any) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let unsubscribe: () => void;
-    
+
     const initAuth = async () => {
       try {
         unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -48,6 +51,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const userDoc = await getDoc(doc(db, 'users', user.uid));
               if (userDoc.exists()) {
                 setUserDetails(userDoc.data());
+              } else {
+                // Create user document if it doesn't exist (for Google Sign-In)
+                await setDoc(doc(db, 'users', user.uid), {
+                  name: user.displayName || '',
+                  email: user.email || '',
+                  credits: 0,
+                  isArtist: false,
+                  createdAt: new Date().toISOString(),
+                });
+                setUserDetails({
+                  name: user.displayName || '',
+                  email: user.email || '',
+                  credits: 0,
+                  isArtist: false,
+                  createdAt: new Date().toISOString(),
+                });
               }
             } catch (error) {
               console.error('Error fetching user details:', error);
@@ -129,6 +148,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInWithGoogle = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Check if user document exists
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (!userDoc.exists()) {
+        // Create new user document
+        await setDoc(doc(db, 'users', user.uid), {
+          name: user.displayName || '',
+          email: user.email || '',
+          credits: 0,
+          isArtist: false,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    } catch (error: any) {
+      console.error('Google sign in error:', error);
+      if (error.code === 'auth/popup-closed-by-user') {
+        // User closed the popup, no need to show error
+        return;
+      }
+      throw error;
+    }
+  };
+
   const value = {
     user,
     userDetails,
@@ -138,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     resetPassword,
     updateUserProfile,
+    signInWithGoogle,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
