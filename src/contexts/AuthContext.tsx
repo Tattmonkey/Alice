@@ -10,24 +10,23 @@ import {
   sendPasswordResetEmail,
   getRedirectResult
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../lib/firebase';
-import { User } from '../types';
+import { User, Creation, Download, CartItem } from '../types';
 import toast from 'react-hot-toast';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  isAdmin: boolean;
+  error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
-  logout: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
-  updateUserCredits: (userId: string, credits: number) => Promise<void>;
-  addToCart: (product: any) => Promise<any>;
-  removeFromCart: (productId: string) => Promise<any>;
-  updateCartItemQuantity: (productId: string, quantity: number) => Promise<any>;
+  addToCart: (item: CartItem) => Promise<void>;
+  removeFromCart: (itemId: string) => Promise<void>;
+  updateCartItemQuantity: (itemId: string, quantity: number) => Promise<void>;
+  addCredits: (amount: number) => Promise<void>;
+  switchToArtist: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -43,6 +42,7 @@ export const useAuth = () => {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -52,14 +52,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (firebaseUser) {
         const userDoc = doc(db, 'users', firebaseUser.uid);
         const userData: User = {
-          id: firebaseUser.uid,
-          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || '',
+          uid: firebaseUser.uid,
           email: firebaseUser.email || '',
+          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || '',
           credits: 5,
-          cart: [],
+          isArtist: false,
           creations: [],
-          bookings: [],
-          role: null
+          downloads: [],
+          cart: []
         };
         await setDoc(userDoc, userData, { merge: true });
         setUser(userData);
@@ -78,17 +78,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
       const userData: User = {
-        id: userCredential.user.uid,
-        name,
+        uid: userCredential.user.uid,
         email,
+        name,
         credits: 5,
-        cart: [],
+        isArtist: false,
         creations: [],
-        bookings: [],
-        role: null
+        downloads: [],
+        cart: []
       };
       
-      const userDoc = doc(db, 'users', userData.id);
+      const userDoc = doc(db, 'users', userData.uid);
       await setDoc(userDoc, userData);
       
       setUser(userData);
@@ -127,17 +127,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await signInWithPopup(auth, googleProvider);
       
       const userData: User = {
-        id: result.user.uid,
-        name: result.user.displayName || result.user.email?.split('@')[0] || '',
+        uid: result.user.uid,
         email: result.user.email || '',
+        name: result.user.displayName || result.user.email?.split('@')[0] || '',
         credits: 5,
-        cart: [],
+        isArtist: false,
         creations: [],
-        bookings: [],
-        role: null
+        downloads: [],
+        cart: []
       };
 
-      const userDoc = doc(db, 'users', userData.id);
+      const userDoc = doc(db, 'users', userData.uid);
       await setDoc(userDoc, userData, { merge: true });
       setUser(userData);
       toast.success('Welcome back!');
@@ -156,24 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const resetPassword = async (email: string) => {
-    try {
-      setLoading(true);
-      await sendPasswordResetEmail(auth, email);
-    } catch (error: any) {
-      console.error('Password reset error:', error);
-      if (error.code === 'auth/user-not-found') {
-        toast.error('No account found with this email');
-      } else {
-        toast.error('Failed to send reset email');
-      }
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = async () => {
+  const signOut = async () => {
     try {
       setLoading(true);
       await signOut(auth);
@@ -189,32 +172,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateUserCredits = async (userId: string, credits: number) => {
+  const addToCart = async (item: CartItem) => {
     if (!user) throw new Error('No user logged in');
 
     try {
-      const userRef = doc(db, 'users', userId);
-      const newCredits = user.credits + credits;
-      await setDoc(userRef, { credits: newCredits }, { merge: true });
-      setUser(prev => prev ? { ...prev, credits: newCredits } : null);
-      toast.success(`${credits > 0 ? 'Added' : 'Used'} ${Math.abs(credits)} credits`);
-    } catch (error) {
-      console.error('Update credits error:', error);
-      throw error;
-    }
-  };
-
-  const addToCart = async (product: any) => {
-    if (!user) throw new Error('No user logged in');
-
-    try {
-      const userRef = doc(db, 'users', user.id);
+      const userRef = doc(db, 'users', user.uid);
       const cart = user.cart;
-      const productIndex = cart.findIndex((item: any) => item.id === product.id);
+      const productIndex = cart.findIndex((cartItem: CartItem) => cartItem.id === item.id);
       if (productIndex !== -1) {
         cart[productIndex].quantity += 1;
       } else {
-        cart.push({ ...product, quantity: 1 });
+        cart.push({ ...item, quantity: 1 });
       }
       await setDoc(userRef, { cart }, { merge: true });
       setUser(prev => prev ? { ...prev, cart } : null);
@@ -225,13 +193,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const removeFromCart = async (productId: string) => {
+  const removeFromCart = async (itemId: string) => {
     if (!user) throw new Error('No user logged in');
 
     try {
-      const userRef = doc(db, 'users', user.id);
+      const userRef = doc(db, 'users', user.uid);
       const cart = user.cart;
-      const productIndex = cart.findIndex((item: any) => item.id === productId);
+      const productIndex = cart.findIndex((item: CartItem) => item.id === itemId);
       if (productIndex !== -1) {
         cart.splice(productIndex, 1);
       }
@@ -244,13 +212,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateCartItemQuantity = async (productId: string, quantity: number) => {
+  const updateCartItemQuantity = async (itemId: string, quantity: number) => {
     if (!user) throw new Error('No user logged in');
 
     try {
-      const userRef = doc(db, 'users', user.id);
+      const userRef = doc(db, 'users', user.uid);
       const cart = user.cart;
-      const productIndex = cart.findIndex((item: any) => item.id === productId);
+      const productIndex = cart.findIndex((item: CartItem) => item.id === itemId);
       if (productIndex !== -1) {
         cart[productIndex].quantity = quantity;
       }
@@ -263,19 +231,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const addCredits = async (amount: number) => {
+    if (!user) return;
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        credits: increment(amount)
+      });
+      setUser(prev => prev ? { ...prev, credits: prev.credits + amount } : null);
+    } catch (error) {
+      console.error('Error adding credits:', error);
+      throw error;
+    }
+  };
+
+  const switchToArtist = async () => {
+    if (!user) return;
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        isArtist: true
+      });
+      setUser(prev => prev ? { ...prev, isArtist: true } : null);
+    } catch (error) {
+      console.error('Error converting to artist:', error);
+      throw error;
+    }
+  };
+
   const value = {
     user,
     loading,
-    isAdmin: false,
+    error,
     signIn,
+    signOut,
     signUp,
-    signInWithGoogle,
-    logout,
-    resetPassword,
-    updateUserCredits,
     addToCart,
     removeFromCart,
-    updateCartItemQuantity
+    updateCartItemQuantity,
+    addCredits,
+    switchToArtist
   };
 
   return (

@@ -19,7 +19,7 @@ import TermsOfService from './pages/TermsOfService';
 import RefundPolicy from './pages/RefundPolicy';
 import UserDashboard from './components/UserDashboard';
 import UserSettings from './components/UserSettings';
-import ArtistDashboard from './components/artists/ArtistDashboard';
+import ArtistDashboard from './components/ArtistDashboard';
 import AdminDashboard from './components/admin/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLogin from './pages/AdminLogin';
@@ -84,7 +84,7 @@ export default function App() {
               path="/dashboard"
               element={
                 <ProtectedRoute>
-                  <UserDashboard />
+                  {user?.isArtist ? <ArtistDashboard /> : <UserDashboard />}
                 </ProtectedRoute>
               }
             />
