@@ -1,33 +1,33 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { auth, db, googleProvider } from '../lib/firebase';
 import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
+  signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  setPersistence,
-  browserLocalPersistence,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  getRedirectResult
 } from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { auth, db, googleProvider } from '../lib/firebase';
 import { User } from '../types';
 import toast from 'react-hot-toast';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
-  logout: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserCredits: (userId: string, credits: number) => Promise<void>;
-  switchToArtist: () => Promise<void>;
-  revertToUser: () => Promise<void>;
-  updateProfile: (data: { name: string; email: string }) => Promise<void>;
-  deleteAccount: () => Promise<void>;
+  addToCart: (product: any) => Promise<any>;
+  removeFromCart: (productId: string) => Promise<any>;
+  updateCartItemQuantity: (productId: string, quantity: number) => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -204,61 +204,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const switchToArtist = async () => {
+  const addToCart = async (product: any) => {
     if (!user) throw new Error('No user logged in');
 
     try {
       const userRef = doc(db, 'users', user.id);
-      const artistRole = {
-        type: 'artist',
-        verified: false,
-        createdAt: new Date().toISOString()
-      };
-      
-      await updateDoc(userRef, { role: artistRole });
-      setUser(prev => prev ? { ...prev, role: artistRole } : null);
+      const cart = user.cart;
+      const productIndex = cart.findIndex((item: any) => item.id === product.id);
+      if (productIndex !== -1) {
+        cart[productIndex].quantity += 1;
+      } else {
+        cart.push({ ...product, quantity: 1 });
+      }
+      await setDoc(userRef, { cart }, { merge: true });
+      setUser(prev => prev ? { ...prev, cart } : null);
+      toast.success('Product added to cart');
     } catch (error) {
-      console.error('Switch to artist error:', error);
+      console.error('Add to cart error:', error);
       throw error;
     }
   };
 
-  const revertToUser = async () => {
+  const removeFromCart = async (productId: string) => {
     if (!user) throw new Error('No user logged in');
 
     try {
       const userRef = doc(db, 'users', user.id);
-      await updateDoc(userRef, { role: null });
-      setUser(prev => prev ? { ...prev, role: null } : null);
+      const cart = user.cart;
+      const productIndex = cart.findIndex((item: any) => item.id === productId);
+      if (productIndex !== -1) {
+        cart.splice(productIndex, 1);
+      }
+      await setDoc(userRef, { cart }, { merge: true });
+      setUser(prev => prev ? { ...prev, cart } : null);
+      toast.success('Product removed from cart');
     } catch (error) {
-      console.error('Revert to user error:', error);
+      console.error('Remove from cart error:', error);
       throw error;
     }
   };
 
-  const updateProfile = async (data: { name: string; email: string }) => {
+  const updateCartItemQuantity = async (productId: string, quantity: number) => {
     if (!user) throw new Error('No user logged in');
 
     try {
       const userRef = doc(db, 'users', user.id);
-      await updateDoc(userRef, data);
-      setUser(prev => prev ? { ...prev, ...data } : null);
+      const cart = user.cart;
+      const productIndex = cart.findIndex((item: any) => item.id === productId);
+      if (productIndex !== -1) {
+        cart[productIndex].quantity = quantity;
+      }
+      await setDoc(userRef, { cart }, { merge: true });
+      setUser(prev => prev ? { ...prev, cart } : null);
+      toast.success('Cart item quantity updated');
     } catch (error) {
-      console.error('Update profile error:', error);
-      throw error;
-    }
-  };
-
-  const deleteAccount = async () => {
-    if (!user) throw new Error('No user logged in');
-
-    try {
-      const userRef = doc(db, 'users', user.id);
-      await deleteDoc(userRef);
-      await auth.currentUser?.delete();
-      setUser(null);
-    } catch (error) {
-      console.error('Delete account error:', error);
+      console.error('Update cart item quantity error:', error);
       throw error;
     }
   };
@@ -266,16 +266,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     loading,
+    isAdmin: false,
     signIn,
     signUp,
-    logout,
     signInWithGoogle,
+    logout,
     resetPassword,
     updateUserCredits,
-    switchToArtist,
-    revertToUser,
-    updateProfile,
-    deleteAccount
+    addToCart,
+    removeFromCart,
+    updateCartItemQuantity
   };
 
   return (

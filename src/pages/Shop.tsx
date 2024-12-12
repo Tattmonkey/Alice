@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Filter, Search, Tag, Heart, Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Product } from '../types';
 
@@ -11,36 +13,29 @@ export default function Shop() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [cartAnimation, setCartAnimation] = useState<string | null>(null);
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: '1',
-      name: 'Tattoo Aftercare Kit',
-      description: 'Complete kit for tattoo aftercare including healing cream, antibacterial soap, and moisturizer.',
-      price: 299.99,
-      images: ['https://images.unsplash.com/photo-1598331668826-20cecc596b86?w=800&q=80'],
-      category: 'Aftercare',
-      tags: ['skincare', 'healing'],
-      stock: 50,
-      sku: 'TAK001',
-      featured: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: '2',
-      name: 'Professional Tattoo Machine',
-      description: 'High-quality tattoo machine for professional artists.',
-      price: 1499.99,
-      images: ['https://images.unsplash.com/photo-1598331668826-20cecc596b86?w=800&q=80'],
-      category: 'Equipment',
-      tags: ['machine', 'professional'],
-      stock: 15,
-      sku: 'PTM001',
-      featured: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-  ]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const productsRef = collection(db, 'products');
+        const querySnapshot = await getDocs(productsRef);
+        const productsData = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Product[];
+        setProducts(productsData);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        toast.error('Failed to load products');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   const handleAddToCart = async (product: Product) => {
     try {
@@ -67,6 +62,15 @@ export default function Shop() {
     const matchesCategory = !selectedCategory || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <ShoppingBag className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Loading...</h3>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white dark:from-[#0f0616] dark:to-[#150a24]">
@@ -149,11 +153,10 @@ export default function Shop() {
                       {product.name}
                     </h3>
                   </Link>
-                  
                   <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">
                     {product.description}
                   </p>
-                  
+
                   <div className="flex flex-wrap gap-2 mb-4">
                     {product.tags.map((tag) => (
                       <span
