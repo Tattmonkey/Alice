@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Upload, Save, Trash2, Palette, Mail, Phone, MapPin, Image as ImageIcon, Type } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import toast from 'react-hot-toast';
-import { storage } from '../../lib/firebase';
+import { storage } from '../../config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface ColorScheme {
