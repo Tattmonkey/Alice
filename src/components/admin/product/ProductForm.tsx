@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 import { Save, Tag, Upload, File, Info } from 'lucide-react';
 import { Product, DownloadableProduct } from '../../../types';
 import ImageUpload from './ImageUpload';
-import { storage } from '../../../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../../../config/firebase';
 import toast from 'react-hot-toast';
 
 interface Props {

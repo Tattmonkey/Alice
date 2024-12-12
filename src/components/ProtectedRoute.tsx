@@ -15,13 +15,7 @@ export default function ProtectedRoute({ children }: Props) {
     return <LoadingScreen />;
   }
 
-  // Special handling for admin routes
-  if (location.pathname.startsWith('/admin/dashboard')) {
-    if (!user || user.role?.type !== 'admin') {
-      return <Navigate to="/admin" replace />;
-    }
-  } else if (!user) {
-    // For non-admin protected routes, redirect to home with return path
+  if (!user) {
     return <Navigate to="/" state={{ from: location }} replace />;
   }
 

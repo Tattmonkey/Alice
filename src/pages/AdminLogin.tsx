@@ -7,7 +7,7 @@ import { Mail, Lock, User, Loader2, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { auth, db } from '../config/firebase';
 import toast from 'react-hot-toast';
 
 const schema = z.object({
@@ -128,11 +128,10 @@ export default function AdminLogin() {
             {loading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
-              <>
-                <Mail className="w-5 h-5 mr-2" />
+              <><Mail className="w-5 h-5 mr-2" />
                 Access Admin Dashboard
-              </>
-            )}
+              </>)
+            }
           </motion.button>
         </form>
       </motion.div>

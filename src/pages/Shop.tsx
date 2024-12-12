@@ -4,7 +4,7 @@ import { ShoppingBag, Filter, Search, Tag, Heart, Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Product } from '../types';
 

@@ -29,22 +29,6 @@ export default function App() {
   const [isSignUpModalOpen, setIsSignUpModalOpen] = React.useState(false);
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = React.useState(false);
 
-  const handleOpenSignUp = () => {
-    setIsLoginModalOpen(false);
-    setIsSignUpModalOpen(true);
-  };
-
-  const handleOpenLogin = () => {
-    setIsSignUpModalOpen(false);
-    setIsResetPasswordModalOpen(false);
-    setIsLoginModalOpen(true);
-  };
-
-  const handleOpenResetPassword = () => {
-    setIsLoginModalOpen(false);
-    setIsResetPasswordModalOpen(true);
-  };
-
   return (
     <AuthProvider>
       <div className="min-h-screen bg-purple-50 dark:bg-[#0f0616] transition-colors flex flex-col">
@@ -58,9 +42,13 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/artists" element={<Artists />} />
             <Route path="/shop" element={<Shop />} />
-            <Route path="/shop/product/:id" element={<ProductDetail />} />
+            <Route path="/shop/:id" element={<ProductDetail />} />
             <Route path="/blog" element={<Blog />} />
-            <Route path="/cart" element={<Cart />} />
+            <Route path="/cart" element={
+              <ProtectedRoute>
+                <Cart />
+              </ProtectedRoute>
+            } />
             <Route path="/checkout" element={
               <ProtectedRoute>
                 <Checkout />
@@ -76,15 +64,15 @@ export default function App() {
                 <UserSettings />
               </ProtectedRoute>
             } />
-            <Route path="/privacy" element={<PrivacyPolicy />} />
-            <Route path="/terms" element={<TermsOfService />} />
-            <Route path="/refunds" element={<RefundPolicy />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
             <Route path="/admin" element={<AdminLogin />} />
             <Route
               path="/dashboard"
               element={
                 <ProtectedRoute>
-                  {user?.isArtist ? <ArtistDashboard /> : <UserDashboard />}
+                  <UserDashboard />
                 </ProtectedRoute>
               }
             />
@@ -112,20 +100,32 @@ export default function App() {
         <LoginModal 
           isOpen={isLoginModalOpen} 
           onClose={() => setIsLoginModalOpen(false)} 
-          onSwitchToSignUp={handleOpenSignUp}
-          onResetPassword={handleOpenResetPassword}
+          onForgotPassword={() => {
+            setIsLoginModalOpen(false);
+            setIsResetPasswordModalOpen(true);
+          }}
+          onSignUpClick={() => {
+            setIsLoginModalOpen(false);
+            setIsSignUpModalOpen(true);
+          }}
         />
         
         <SignUpModal 
           isOpen={isSignUpModalOpen} 
           onClose={() => setIsSignUpModalOpen(false)}
-          onSwitchToLogin={handleOpenLogin}
+          onLoginClick={() => {
+            setIsSignUpModalOpen(false);
+            setIsLoginModalOpen(true);
+          }}
         />
 
         <ResetPasswordModal
           isOpen={isResetPasswordModalOpen}
           onClose={() => setIsResetPasswordModalOpen(false)}
-          onBackToLogin={handleOpenLogin}
+          onLoginClick={() => {
+            setIsResetPasswordModalOpen(false);
+            setIsLoginModalOpen(true);
+          }}
         />
       </div>
     </AuthProvider>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Settings, Users, CreditCard, Image, Bell, Key, BarChart3, BookOpen, Package, ShoppingBag, Loader2, UserCog, Truck } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { db } from '../../config/firebase';
 import toast from 'react-hot-toast';
 import StatsPanel from './StatsPanel';
 import APISettings from './APISettings';
