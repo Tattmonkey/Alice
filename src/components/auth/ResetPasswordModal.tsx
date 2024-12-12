@@ -4,7 +4,7 @@ import { Mail, ArrowLeft, Loader2, X, CheckCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { auth } from '../../lib/firebase';
+import { auth } from '../../config/firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import toast from 'react-hot-toast';
 
