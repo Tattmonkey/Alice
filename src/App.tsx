@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { MessagingProvider } from './contexts/MessagingContext';
 import { GalleryProvider } from './contexts/GalleryContext';
 import { BookingProvider } from './contexts/BookingContext';
+import { User } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Artists from './pages/Artists';
@@ -28,8 +29,35 @@ import UserBookings from './components/user/UserBookings';
 import ArtistDashboard from './components/artists/ArtistDashboard';
 import ArtistSettings from './components/artists/ArtistSettings';
 import AdminDashboard from './components/admin/AdminDashboard';
+import UserManager from './components/admin/UserManager';
+import ProductManager from './components/admin/ProductManager';
+import BlogManager from './components/admin/BlogManager';
+import AnalyticsDashboard from './components/admin/AnalyticsDashboard';
+import NotificationCenter from './components/admin/NotificationCenter';
+import PaymentSettings from './components/admin/PaymentSettings';
+import ShippingManager from './components/admin/shipping/ShippingManager';
+import APISettings from './components/admin/APISettings';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLogin from './pages/AdminLogin';
+
+interface AdminRouteProps {
+  children: React.ReactNode;
+}
+
+const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => (
+  <ProtectedRoute>
+    {({ user }: { user: User }) => {
+      if (user?.role?.type !== 'admin') {
+        return (
+          <div className="text-red-500 p-4">
+            Must be an admin to access this page
+          </div>
+        );
+      }
+      return <>{children}</>;
+    }}
+  </ProtectedRoute>
+);
 
 export default function App() {
   return (
@@ -106,12 +134,78 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  
+                  {/* Admin Routes */}
                   <Route
                     path="/admin/dashboard"
                     element={
-                      <ProtectedRoute>
+                      <AdminRoute>
                         <AdminDashboard />
-                      </ProtectedRoute>
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/users"
+                    element={
+                      <AdminRoute>
+                        <UserManager />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/products"
+                    element={
+                      <AdminRoute>
+                        <ProductManager />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/blog"
+                    element={
+                      <AdminRoute>
+                        <BlogManager />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/analytics"
+                    element={
+                      <AdminRoute>
+                        <AnalyticsDashboard />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/notifications"
+                    element={
+                      <AdminRoute>
+                        <NotificationCenter />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/payments"
+                    element={
+                      <AdminRoute>
+                        <PaymentSettings />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/shipping"
+                    element={
+                      <AdminRoute>
+                        <ShippingManager />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/api"
+                    element={
+                      <AdminRoute>
+                        <APISettings />
+                      </AdminRoute>
                     }
                   />
                 </Routes>
