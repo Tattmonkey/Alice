@@ -23,17 +23,15 @@ export default function UserDashboard() {
 
   const handleArtistConversion = async () => {
     try {
-      setError(null);
       setIsConverting(true);
+      setError(null);
       await convertToArtist();
-      // After conversion, navigate to artist settings to complete profile
+      setShowConfirmation(false);
       navigate('/artist/settings');
     } catch (err) {
-      console.error('Error converting to artist:', err);
-      setError(err instanceof Error ? err.message : 'Failed to convert to artist. Please try again.');
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsConverting(false);
-      setShowConfirmation(false);
     }
   };
 
@@ -53,7 +51,7 @@ export default function UserDashboard() {
             initial={{ scale: 0.95 }}
             animate={{ scale: 1 }}
             exit={{ scale: 0.95 }}
-            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full"
+            className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full"
           >
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -61,48 +59,37 @@ export default function UserDashboard() {
               </h3>
               <button
                 onClick={() => setShowConfirmation(false)}
-                className="text-gray-400 hover:text-gray-500"
+                className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
               >
-                <X className="w-5 h-5" />
+                <X size={20} />
               </button>
             </div>
             <p className="text-gray-600 dark:text-gray-300 mb-4">
-              Are you sure you want to become an artist? This will:
+              Are you sure you want to convert your account to an artist account? This action cannot be undone.
             </p>
-            <ul className="list-disc list-inside text-gray-600 dark:text-gray-300 mb-6 space-y-2">
-              <li>Create your artist profile</li>
-              <li>Allow you to set up services and availability</li>
-              <li>Enable booking management</li>
-              <li>Submit your application for review</li>
-            </ul>
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end space-x-4">
               <button
                 onClick={() => setShowConfirmation(false)}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 
-                  dark:hover:bg-gray-700 rounded-lg"
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500 dark:text-gray-300 dark:hover:text-gray-100"
               >
                 Cancel
               </button>
               <button
                 onClick={handleArtistConversion}
                 disabled={isConverting}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 
-                  disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
               >
                 {isConverting ? (
-                  <>
-                    <Loader className="w-4 h-4 animate-spin" />
-                    Converting...
-                  </>
+                  <Loader className="animate-spin" size={16} />
                 ) : (
                   'Confirm'
                 )}
               </button>
             </div>
             {error && (
-              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg flex items-center gap-2">
-                <AlertCircle className="w-5 h-5" />
-                {error}
+              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-md flex items-center space-x-2">
+                <AlertCircle size={16} />
+                <span>{error}</span>
               </div>
             )}
           </motion.div>
@@ -113,100 +100,89 @@ export default function UserDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white dark:from-[#0f0616] dark:to-[#150a24] p-6">
-      <ConfirmationModal />
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Welcome back, {user?.name}
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Dashboard
           </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Manage your orders, appointments, and credits
-          </p>
+          {!isArtist && (
+            <button
+              onClick={() => setShowConfirmation(true)}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+            >
+              <Palette className="mr-2" size={16} />
+              Become an Artist
+            </button>
+          )}
+          {isPendingArtist && (
+            <div className="flex items-center text-yellow-600 dark:text-yellow-400">
+              <Loader className="animate-spin mr-2" size={16} />
+              Artist Application Pending
+            </div>
+          )}
         </div>
 
-        {/* Dashboard Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <ConfirmationModal />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <DashboardCard
-            title="Create Design"
-            description="Generate unique tattoo designs with AI"
-            icon={ImageIcon}
-            onClick={() => navigate('/create')}
+            icon={Calendar}
+            title="My Bookings"
+            description="View and manage your bookings"
+            onClick={() => navigate('/bookings')}
           />
           <DashboardCard
-            title="My Designs"
-            description="View and manage your generated designs"
-            icon={Palette}
-            onClick={() => navigate('/designs')}
-          />
-          <DashboardCard
-            title="Messages"
-            description="Chat with artists and manage bookings"
             icon={MessageSquare}
+            title="Messages"
+            description="Chat with artists and clients"
             onClick={() => navigate('/messages')}
           />
+          <DashboardCard
+            icon={ImageIcon}
+            title="Gallery"
+            description="View your saved artwork"
+            onClick={() => navigate('/gallery')}
+          />
+          <DashboardCard
+            icon={Settings}
+            title="Settings"
+            description="Manage your account settings"
+            onClick={() => navigate('/settings')}
+          />
         </div>
-
-        {/* Become an Artist Section */}
-        {!isArtist && (
-          <motion.div
-            whileHover={{ scale: 1.01 }}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-8 text-white shadow-lg"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold mb-2">Become an Artist</h2>
-                <p className="text-purple-100 mb-4">
-                  Share your artwork and connect with clients
-                </p>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowConfirmation(true)}
-                  className="px-6 py-3 bg-white text-purple-600 rounded-lg font-medium hover:bg-purple-50 
-                    transition-all duration-300 flex items-center gap-2"
-                >
-                  Get Started
-                  <ChevronRight className="w-5 h-5" />
-                </motion.button>
-              </div>
-              <Palette className="w-24 h-24 text-purple-300" />
-            </div>
-          </motion.div>
-        )}
       </div>
     </div>
   );
 }
 
 interface DashboardCardProps {
+  icon: React.ElementType;
   title: string;
   description: string;
-  icon: React.ElementType;
   onClick: () => void;
-  disabled?: boolean;
 }
 
-function DashboardCard({ 
-  title, 
-  description, 
-  icon: Icon, 
+const DashboardCard: React.FC<DashboardCardProps> = ({
+  icon: Icon,
+  title,
+  description,
   onClick,
-  disabled = false 
-}: DashboardCardProps) {
-  return (
-    <motion.div
-      whileHover={{ scale: 1.02 }}
-      className={`bg-white dark:bg-[#1a0b2e] p-6 rounded-xl shadow-lg cursor-pointer
-        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-      onClick={disabled ? undefined : onClick}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <Icon className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-        <ChevronRight className="w-5 h-5 text-gray-400" />
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{title}</h3>
-      <p className="text-gray-600 dark:text-gray-300">{description}</p>
-    </motion.div>
-  );
-}
+}) => (
+  <motion.button
+    whileHover={{ scale: 1.02 }}
+    whileTap={{ scale: 0.98 }}
+    onClick={onClick}
+    className="w-full p-6 bg-white dark:bg-gray-800/50 rounded-xl shadow-sm hover:shadow-md transition-all text-left group"
+  >
+    <div className="flex justify-between items-start">
+      <Icon className="text-purple-600 dark:text-purple-400" size={24} />
+      <ChevronRight className="text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors" size={20} />
+    </div>
+    <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">
+      {title}
+    </h3>
+    <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+      {description}
+    </p>
+  </motion.button>
+);

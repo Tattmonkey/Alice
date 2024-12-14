@@ -1,203 +1,285 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
-  User,
   signInWithEmailAndPassword,
+  signInWithPopup,
   createUserWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
-  sendPasswordResetEmail,
   GoogleAuthProvider,
-  signInWithPopup,
+  onAuthStateChanged,
+  User as FirebaseUser,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { switchToArtist } from '../services/firebase/users';
 
-interface AuthContextType {
-  user: User | null;
-  userDetails: any | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, name: string) => Promise<void>;
-  logout: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
-  updateUserProfile: (data: any) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
-  convertToArtist: () => Promise<void>;
+interface User {
+  id: string;
+  uid: string;
+  role?: {
+    type: 'user' | 'artist' | 'admin';
+    status?: 'pending' | 'approved' | 'rejected';
+  };
+  displayName: string | null;
+  email: string | null;
+  name?: string;
+  photoURL: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  error: string | null;
+  signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signUp: (email: string, password: string, name: string) => Promise<void>;
+  logout: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  convertToArtist: () => Promise<void>;
+  updateUserRole: (userId: string, role: { type: 'user' | 'artist' | 'admin'; status?: 'pending' | 'approved' | 'rejected' }) => Promise<void>;
+}
 
-export function useAuth() {
+const defaultContext: AuthContextType = {
+  user: null,
+  loading: true,
+  error: null,
+  signIn: async () => {},
+  signInWithGoogle: async () => {},
+  signUp: async () => {},
+  logout: async () => {},
+  resetPassword: async () => {},
+  convertToArtist: async () => {},
+  updateUserRole: async () => {},
+};
+
+export const AuthContext = createContext<AuthContextType>(defaultContext);
+
+export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [userDetails, setUserDetails] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let unsubscribe: () => void;
-
-    const initAuth = async () => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
-        unsubscribe = onAuthStateChanged(auth, async (user) => {
-          setUser(user);
-          if (user) {
-            try {
-              const userDoc = await getDoc(doc(db, 'users', user.uid));
-              if (userDoc.exists()) {
-                setUserDetails(userDoc.data());
-              } else {
-                // Create user document if it doesn't exist (for Google Sign-In)
-                await setDoc(doc(db, 'users', user.uid), {
-                  name: user.displayName || '',
-                  email: user.email || '',
-                  credits: 0,
-                  isArtist: false,
-                  createdAt: new Date().toISOString(),
-                });
-                setUserDetails({
-                  name: user.displayName || '',
-                  email: user.email || '',
-                  credits: 0,
-                  isArtist: false,
-                  createdAt: new Date().toISOString(),
-                });
-              }
-            } catch (error) {
-              console.error('Error fetching user details:', error);
-            }
-          } else {
-            setUserDetails(null);
-          }
-          setLoading(false);
-        });
-      } catch (error) {
-        console.error('Error initializing auth:', error);
+        if (firebaseUser) {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          const userData = userDoc.data();
+
+          setUser({
+            id: firebaseUser.uid,
+            uid: firebaseUser.uid,
+            displayName: firebaseUser.displayName,
+            email: firebaseUser.email,
+            photoURL: firebaseUser.photoURL,
+            name: userData?.name,
+            role: userData?.role,
+            createdAt: userData?.createdAt,
+            updatedAt: userData?.updatedAt,
+          });
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
         setLoading(false);
       }
-    };
+    });
 
-    initAuth();
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
+    return () => unsubscribe();
   }, []);
 
-  const signup = async (email: string, password: string, name: string) => {
+  const signIn = async (email: string, password: string) => {
     try {
-      const { user } = await createUserWithEmailAndPassword(auth, email, password);
-      await setDoc(doc(db, 'users', user.uid), {
-        name,
-        email,
-        credits: 0,
-        isArtist: false,
-        createdAt: new Date().toISOString(),
+      setError(null);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      const userData = userDoc.data();
+
+      setUser({
+        id: userCredential.user.uid,
+        uid: userCredential.user.uid,
+        displayName: userCredential.user.displayName,
+        email: userCredential.user.email,
+        photoURL: userCredential.user.photoURL,
+        name: userData?.name,
+        role: userData?.role,
+        createdAt: userData?.createdAt,
+        updatedAt: userData?.updatedAt,
       });
-    } catch (error) {
-      console.error('Error in signup:', error);
-      throw error;
-    }
-  };
-
-  const login = async (email: string, password: string) => {
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      console.error('Error in login:', error);
-      throw error;
-    }
-  };
-
-  const logout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error('Error in logout:', error);
-      throw error;
-    }
-  };
-
-  const resetPassword = async (email: string) => {
-    try {
-      await sendPasswordResetEmail(auth, email);
-    } catch (error) {
-      console.error('Error in reset password:', error);
-      throw error;
-    }
-  };
-
-  const updateUserProfile = async (data: any) => {
-    if (!user) return;
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        ...data,
-        updatedAt: new Date().toISOString(),
-      });
-      setUserDetails((prev: any) => ({ ...prev, ...data }));
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      throw error;
+    } catch (err) {
+      console.error('Error signing in:', err);
+      setError(err instanceof Error ? err.message : 'Failed to sign in');
+      throw err;
     }
   };
 
   const signInWithGoogle = async () => {
     try {
+      setError(null);
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error('Error in Google sign in:', error);
-      throw error;
+      const userCredential = await signInWithPopup(auth, provider);
+      
+      const userDoc = doc(db, 'users', userCredential.user.uid);
+      const userSnapshot = await getDoc(userDoc);
+
+      if (!userSnapshot.exists()) {
+        // Create new user document if it doesn't exist
+        await setDoc(userDoc, {
+          name: userCredential.user.displayName,
+          email: userCredential.user.email,
+          photoURL: userCredential.user.photoURL,
+          role: { type: 'user' },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      const userData = userSnapshot.data();
+      setUser({
+        id: userCredential.user.uid,
+        uid: userCredential.user.uid,
+        displayName: userCredential.user.displayName,
+        email: userCredential.user.email,
+        photoURL: userCredential.user.photoURL,
+        name: userData?.name,
+        role: userData?.role,
+        createdAt: userData?.createdAt,
+        updatedAt: userData?.updatedAt,
+      });
+    } catch (err) {
+      console.error('Error signing in with Google:', err);
+      setError(err instanceof Error ? err.message : 'Failed to sign in with Google');
+      throw err;
+    }
+  };
+
+  const signUp = async (email: string, password: string, name: string) => {
+    try {
+      setError(null);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      const userDoc = doc(db, 'users', userCredential.user.uid);
+      await setDoc(userDoc, {
+        name,
+        email,
+        role: { type: 'user' },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      setUser({
+        id: userCredential.user.uid,
+        uid: userCredential.user.uid,
+        displayName: name,
+        email: userCredential.user.email,
+        photoURL: null,
+        name,
+        role: { type: 'user' },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('Error signing up:', err);
+      setError(err instanceof Error ? err.message : 'Failed to sign up');
+      throw err;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      setError(null);
+      await signOut(auth);
+      setUser(null);
+    } catch (err) {
+      console.error('Error signing out:', err);
+      setError(err instanceof Error ? err.message : 'Failed to sign out');
+      throw err;
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      setError(null);
+      await sendPasswordResetEmail(auth, email);
+    } catch (err) {
+      console.error('Error resetting password:', err);
+      setError(err instanceof Error ? err.message : 'Failed to reset password');
+      throw err;
     }
   };
 
   const convertToArtist = async () => {
-    if (!user) throw new Error('No user logged in');
     try {
-      await switchToArtist(user.uid, {
-        displayName: userDetails.name,
-        bio: '',
-        specialties: [],
-        experience: '',
-        portfolio: [],
-        hourlyRate: 0,
-      });
-      // Refresh user details
+      setError(null);
+      if (!user) throw new Error('No user logged in');
+      
+      await switchToArtist(user.uid);
+      
+      // Update local user state
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.exists()) {
-        setUserDetails(userDoc.data());
+      const userData = userDoc.data();
+      
+      setUser(prev => prev ? {
+        ...prev,
+        role: userData?.role || { type: 'artist', status: 'pending' }
+      } : null);
+    } catch (err) {
+      console.error('Error converting to artist:', err);
+      setError(err instanceof Error ? err.message : 'Failed to convert to artist');
+      throw err;
+    }
+  };
+
+  const updateUserRole = async (
+    userId: string,
+    role: { type: 'user' | 'artist' | 'admin'; status?: 'pending' | 'approved' | 'rejected' }
+  ) => {
+    try {
+      setError(null);
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        role,
+        updatedAt: new Date().toISOString(),
+      });
+
+      if (user && user.uid === userId) {
+        setUser(prev => prev ? {
+          ...prev,
+          role
+        } : null);
       }
-    } catch (error) {
-      console.error('Error converting to artist:', error);
-      throw error;
+    } catch (err) {
+      console.error('Error updating user role:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update user role');
+      throw err;
     }
   };
 
   const value = {
     user,
-    userDetails,
     loading,
-    login,
-    signup,
+    error,
+    signIn,
+    signInWithGoogle,
+    signUp,
     logout,
     resetPassword,
-    updateUserProfile,
-    signInWithGoogle,
+    updateUserRole,
     convertToArtist,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
