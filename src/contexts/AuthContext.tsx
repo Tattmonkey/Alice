@@ -40,18 +40,20 @@ export interface AuthContextType {
   updateUserRole: (userId: string, role: { type: 'user' | 'artist' | 'admin'; status?: 'pending' | 'approved' | 'rejected' }) => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextType>({
+const defaultContext: AuthContextType = {
   user: null,
   loading: true,
   error: null,
-  signIn: async () => {},
-  signInWithGoogle: async () => {},
-  signUp: async () => {},
-  logout: async () => {},
-  resetPassword: async () => {},
-  convertToArtist: async () => {},
-  updateUserRole: async () => {},
-});
+  signIn: async () => { throw new Error('AuthContext not initialized'); },
+  signInWithGoogle: async () => { throw new Error('AuthContext not initialized'); },
+  signUp: async () => { throw new Error('AuthContext not initialized'); },
+  logout: async () => { throw new Error('AuthContext not initialized'); },
+  resetPassword: async () => { throw new Error('AuthContext not initialized'); },
+  convertToArtist: async () => { throw new Error('AuthContext not initialized'); },
+  updateUserRole: async () => { throw new Error('AuthContext not initialized'); },
+};
+
+export const AuthContext = createContext<AuthContextType>(defaultContext);
 
 export function useAuth() {
   const context = useContext(AuthContext);
@@ -69,25 +71,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Get additional user data from Firestore
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        const userData = userDoc.data();
-        
-        // Combine Firebase user with Firestore data
-        const enrichedUser: User = {
-          ...firebaseUser,
-          id: firebaseUser.uid,
-          uid: firebaseUser.uid,
-          role: userData?.role || { type: 'user' },
-          displayName: firebaseUser.displayName || userData?.displayName || null,
-          email: firebaseUser.email || userData?.email || null,
-          name: userData?.name || firebaseUser.displayName || null,
-          photoURL: firebaseUser.photoURL,
-          createdAt: userData?.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        
-        setUser(enrichedUser);
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          const userData = userDoc.data();
+          
+          const enrichedUser: User = {
+            ...firebaseUser,
+            id: firebaseUser.uid,
+            uid: firebaseUser.uid,
+            role: userData?.role || { type: 'user' },
+            displayName: firebaseUser.displayName || userData?.displayName || null,
+            email: firebaseUser.email || userData?.email || null,
+            name: userData?.name || firebaseUser.displayName || null,
+            photoURL: firebaseUser.photoURL,
+            createdAt: userData?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          
+          setUser(enrichedUser);
+        } catch (err) {
+          console.error('Error loading user data:', err);
+          setUser(null);
+        }
       } else {
         setUser(null);
       }
@@ -113,10 +118,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       
-      // Check if this is a new user
       const userDoc = await getDoc(doc(db, 'users', result.user.uid));
       if (!userDoc.exists()) {
-        // Create new user document
         await setDoc(doc(db, 'users', result.user.uid), {
           email: result.user.email,
           displayName: result.user.displayName,
@@ -138,7 +141,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       const result = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Create user document in Firestore
       await setDoc(doc(db, 'users', result.user.uid), {
         email,
         displayName: name,
@@ -148,7 +150,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updatedAt: new Date().toISOString(),
       });
       
-      // Update Firebase user profile
       if (result.user) {
         await updateDoc(doc(db, 'users', result.user.uid), {
           displayName: name,
@@ -190,7 +191,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updatedAt: new Date().toISOString()
       });
       
-      // Update local user state if it's the current user
       if (user && user.uid === userId) {
         setUser(prev => prev ? { ...prev, role } : null);
       }
@@ -205,10 +205,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     try {
       setError(null);
-      // Update user role to artist with pending status
       await updateUserRole(user.uid, { type: 'artist', status: 'pending' });
       
-      // Create initial artist profile
       await setDoc(doc(db, 'artistProfiles', user.uid), {
         userId: user.uid,
         displayName: user.displayName,
@@ -227,6 +225,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updatedAt: new Date().toISOString(),
       });
     } catch (err) {
+      console.error('Error converting to artist account:', err);
       setError(err instanceof Error ? err.message : 'Failed to convert to artist');
       throw err;
     }
