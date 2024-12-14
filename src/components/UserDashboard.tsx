@@ -1,130 +1,157 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { CreditCard, Calendar, ShoppingBag, Palette, ChevronRight, Plus, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { 
+  Palette, 
+  Calendar, 
+  MessageCircle, 
+  Image as ImageIcon,
+  Settings,
+  ChevronRight,
+  Loader
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import CreditPlans from './CreditPlans';
 
 export default function UserDashboard() {
-  const { user, switchToArtist } = useAuth();
+  const { user, convertToArtist } = useAuth();
   const navigate = useNavigate();
-  const [showCreditPlans, setShowCreditPlans] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleArtistConversion = async () => {
     try {
-      await switchToArtist();
-      navigate('/artist/dashboard');
-    } catch (error) {
-      console.error('Error converting to artist account:', error);
+      setError(null);
+      setIsConverting(true);
+      await convertToArtist();
+      // After conversion, navigate to artist settings to complete profile
+      navigate('/artist/settings');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to convert to artist');
+    } finally {
+      setIsConverting(false);
     }
   };
 
+  const DashboardCard = ({ 
+    title, 
+    description, 
+    icon: Icon, 
+    onClick,
+    disabled = false 
+  }: {
+    title: string;
+    description: string;
+    icon: React.ElementType;
+    onClick: () => void;
+    disabled?: boolean;
+  }) => (
+    <motion.div
+      whileHover={{ scale: disabled ? 1 : 1.02 }}
+      whileTap={{ scale: disabled ? 1 : 0.98 }}
+      className={`bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 cursor-pointer 
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'}`}
+      onClick={disabled ? undefined : onClick}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+              <Icon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {title}
+            </h3>
+          </div>
+          <p className="text-gray-600 dark:text-gray-300">{description}</p>
+        </div>
+        <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+      </div>
+    </motion.div>
+  );
+
+  const isArtist = user?.role?.type === 'artist';
+  const isPendingArtist = isArtist && user?.role?.status === 'pending';
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white dark:from-[#0f0616] dark:to-[#150a24] p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Welcome back, {user?.name}
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Manage your orders, appointments, and credits
-          </p>
-        </div>
-
-        {/* Credits Section */}
-        <div className="bg-white dark:bg-[#1a0b2e] rounded-xl p-6 mb-6 shadow-lg">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-1">
-                Your Credits
-              </h2>
-              <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-                {user?.credits || 0} credits
-              </p>
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setShowCreditPlans(true)}
-              className="px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-all duration-300 flex items-center gap-2"
-            >
-              <Plus className="w-5 h-5" />
-              Top Up Credits
-            </motion.button>
-          </div>
-          
-          {showCreditPlans && (
-            <CreditPlans onClose={() => setShowCreditPlans(false)} />
-          )}
-        </div>
-
-        {/* Quick Actions Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {/* Orders Card */}
-          <motion.div
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Dashboard
+        </h1>
+        {!isArtist && (
+          <motion.button
             whileHover={{ scale: 1.02 }}
-            className="bg-white dark:bg-[#1a0b2e] p-6 rounded-xl shadow-lg"
+            whileTap={{ scale: 0.98 }}
+            onClick={handleArtistConversion}
+            disabled={isConverting}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 
+              disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            <div className="flex items-center justify-between mb-4">
-              <ShoppingBag className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-              <span className="text-sm text-gray-500 dark:text-gray-400">View All</span>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Recent Orders</h3>
-            <p className="text-gray-600 dark:text-gray-300">Track and manage your orders</p>
-          </motion.div>
+            {isConverting ? (
+              <>
+                <Loader className="w-4 h-4 animate-spin" />
+                Converting...
+              </>
+            ) : (
+              <>
+                <Palette className="w-4 h-4" />
+                Become an Artist
+              </>
+            )}
+          </motion.button>
+        )}
+      </div>
 
-          {/* Appointments Card */}
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            className="bg-white dark:bg-[#1a0b2e] p-6 rounded-xl shadow-lg"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <Calendar className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-              <span className="text-sm text-gray-500 dark:text-gray-400">Schedule</span>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Appointments</h3>
-            <p className="text-gray-600 dark:text-gray-300">View and book appointments</p>
-          </motion.div>
-
-          {/* Credit History Card */}
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            className="bg-white dark:bg-[#1a0b2e] p-6 rounded-xl shadow-lg"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <CreditCard className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-              <span className="text-sm text-gray-500 dark:text-gray-400">History</span>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Credit History</h3>
-            <p className="text-gray-600 dark:text-gray-300">View your credit transactions</p>
-          </motion.div>
+      {error && (
+        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+          {error}
         </div>
+      )}
 
-        {/* Become an Artist Section */}
-        <motion.div
-          whileHover={{ scale: 1.01 }}
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-8 text-white shadow-lg"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold mb-2">Become an Artist</h2>
-              <p className="text-purple-100 mb-4">
-                Share your artwork and connect with clients
-              </p>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleArtistConversion}
-                className="px-6 py-3 bg-white text-purple-600 rounded-lg font-medium hover:bg-purple-50 transition-all duration-300 flex items-center gap-2"
-              >
-                <Palette className="w-5 h-5" />
-                Convert to Artist Account
-              </motion.button>
-            </div>
-            <ChevronRight className="w-8 h-8 text-purple-200" />
-          </div>
-        </motion.div>
+      {isPendingArtist && (
+        <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-lg">
+          Your artist application is pending approval. You'll be notified once it's approved.
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <DashboardCard
+          title="Bookings"
+          description="View and manage your appointments"
+          icon={Calendar}
+          onClick={() => navigate('/bookings')}
+        />
+
+        <DashboardCard
+          title="Messages"
+          description="Chat with artists and clients"
+          icon={MessageCircle}
+          onClick={() => navigate('/messages')}
+        />
+
+        <DashboardCard
+          title="Gallery"
+          description="View and manage your saved designs"
+          icon={ImageIcon}
+          onClick={() => navigate('/gallery')}
+        />
+
+        <DashboardCard
+          title="Settings"
+          description="Update your profile and preferences"
+          icon={Settings}
+          onClick={() => navigate('/settings')}
+        />
+
+        {isArtist && (
+          <DashboardCard
+            title="Artist Dashboard"
+            description="Manage your artist profile and services"
+            icon={Palette}
+            onClick={() => navigate('/artist/dashboard')}
+            disabled={isPendingArtist}
+          />
+        )}
       </div>
     </div>
   );
