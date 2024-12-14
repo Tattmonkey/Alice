@@ -11,6 +11,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
+import { switchToArtist } from '../services/firebase/users';
 
 interface AuthContextType {
   user: User | null;
@@ -22,6 +23,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (data: any) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  convertToArtist: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -134,14 +136,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateUserProfile = async (data: any) => {
-    if (!user) throw new Error('No user logged in');
+    if (!user) return;
     try {
       const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, data);
-      const updatedDoc = await getDoc(userRef);
-      if (updatedDoc.exists()) {
-        setUserDetails(updatedDoc.data());
-      }
+      await updateDoc(userRef, {
+        ...data,
+        updatedAt: new Date().toISOString(),
+      });
+      setUserDetails((prev: any) => ({ ...prev, ...data }));
     } catch (error) {
       console.error('Error updating profile:', error);
       throw error;
@@ -151,27 +153,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error('Error in Google sign in:', error);
+      throw error;
+    }
+  };
 
-      // Check if user document exists
+  const convertToArtist = async () => {
+    if (!user) throw new Error('No user logged in');
+    try {
+      await switchToArtist(user.uid, {
+        displayName: userDetails.name,
+        bio: '',
+        specialties: [],
+        experience: '',
+        portfolio: [],
+        hourlyRate: 0,
+      });
+      // Refresh user details
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists()) {
-        // Create new user document
-        await setDoc(doc(db, 'users', user.uid), {
-          name: user.displayName || '',
-          email: user.email || '',
-          credits: 0,
-          isArtist: false,
-          createdAt: new Date().toISOString(),
-        });
+      if (userDoc.exists()) {
+        setUserDetails(userDoc.data());
       }
-    } catch (error: any) {
-      console.error('Google sign in error:', error);
-      if (error.code === 'auth/popup-closed-by-user') {
-        // User closed the popup, no need to show error
-        return;
-      }
+    } catch (error) {
+      console.error('Error converting to artist:', error);
       throw error;
     }
   };
@@ -186,7 +192,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetPassword,
     updateUserProfile,
     signInWithGoogle,
+    convertToArtist,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }

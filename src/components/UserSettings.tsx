@@ -41,12 +41,10 @@ export default function UserSettings() {
   const handleSwitchToArtist = async () => {
     try {
       setLoading(true);
-      await switchToArtist();
-      toast.success('Successfully switched to artist account');
-      navigate('/artist/dashboard');
+      navigate('/profile/become-artist');
     } catch (error) {
-      console.error('Switch to artist error:', error);
-      toast.error('Failed to switch account type');
+      console.error('Error navigating to artist form:', error);
+      toast.error('Failed to navigate to artist form');
     } finally {
       setLoading(false);
     }
