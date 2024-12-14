@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { 
   Palette, 
   Calendar, 
-  MessageCircle, 
+  MessageSquare, 
   Image as ImageIcon,
   Settings,
   ChevronRight,
@@ -31,43 +31,6 @@ export default function UserDashboard() {
       setIsConverting(false);
     }
   };
-
-  const DashboardCard = ({ 
-    title, 
-    description, 
-    icon: Icon, 
-    onClick,
-    disabled = false 
-  }: {
-    title: string;
-    description: string;
-    icon: React.ElementType;
-    onClick: () => void;
-    disabled?: boolean;
-  }) => (
-    <motion.div
-      whileHover={{ scale: disabled ? 1 : 1.02 }}
-      whileTap={{ scale: disabled ? 1 : 0.98 }}
-      className={`bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 cursor-pointer 
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'}`}
-      onClick={disabled ? undefined : onClick}
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-              <Icon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {title}
-            </h3>
-          </div>
-          <p className="text-gray-600 dark:text-gray-300">{description}</p>
-        </div>
-        <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500" />
-      </div>
-    </motion.div>
-  );
 
   const isArtist = user?.role?.type === 'artist';
   const isPendingArtist = isArtist && user?.role?.status === 'pending';
@@ -125,7 +88,7 @@ export default function UserDashboard() {
         <DashboardCard
           title="Messages"
           description="Chat with artists and clients"
-          icon={MessageCircle}
+          icon={MessageSquare}
           onClick={() => navigate('/messages')}
         />
 
@@ -156,3 +119,42 @@ export default function UserDashboard() {
     </div>
   );
 }
+
+interface DashboardCardProps {
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  onClick: () => void;
+  disabled?: boolean;
+}
+
+const DashboardCard: React.FC<DashboardCardProps> = ({ 
+  title, 
+  description, 
+  icon: Icon, 
+  onClick,
+  disabled = false 
+}) => (
+  <motion.div
+    whileHover={{ scale: disabled ? 1 : 1.02 }}
+    whileTap={{ scale: disabled ? 1 : 0.98 }}
+    className={`bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 cursor-pointer 
+      ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'}`}
+    onClick={disabled ? undefined : onClick}
+  >
+    <div className="flex items-start justify-between">
+      <div className="flex-1">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+            <Icon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {title}
+          </h3>
+        </div>
+        <p className="text-gray-600 dark:text-gray-300">{description}</p>
+      </div>
+      <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+    </div>
+  </motion.div>
+);

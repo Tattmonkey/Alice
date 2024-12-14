@@ -12,16 +12,22 @@ import {
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
-interface User extends FirebaseUser {
+export interface User extends Omit<FirebaseUser, 'id'> {
+  id: string;
+  uid: string;
   role?: {
     type: 'user' | 'artist' | 'admin';
     status?: 'pending' | 'approved' | 'rejected';
   };
   displayName: string | null;
   email: string | null;
+  name?: string;
+  photoURL: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
@@ -30,11 +36,30 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  updateUserRole: (userId: string, role: { type: 'user' | 'artist' | 'admin'; status?: 'pending' | 'approved' | 'rejected' }) => Promise<void>;
   convertToArtist: () => Promise<void>;
+  updateUserRole: (userId: string, role: { type: 'user' | 'artist' | 'admin'; status?: 'pending' | 'approved' | 'rejected' }) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  error: null,
+  signIn: async () => {},
+  signInWithGoogle: async () => {},
+  signUp: async () => {},
+  logout: async () => {},
+  resetPassword: async () => {},
+  convertToArtist: async () => {},
+  updateUserRole: async () => {},
+});
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -51,9 +76,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Combine Firebase user with Firestore data
         const enrichedUser: User = {
           ...firebaseUser,
+          id: firebaseUser.uid,
+          uid: firebaseUser.uid,
           role: userData?.role || { type: 'user' },
           displayName: firebaseUser.displayName || userData?.displayName || null,
           email: firebaseUser.email || userData?.email || null,
+          name: userData?.name || firebaseUser.displayName || null,
+          photoURL: firebaseUser.photoURL,
+          createdAt: userData?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
         
         setUser(enrichedUser);
@@ -89,8 +120,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await setDoc(doc(db, 'users', result.user.uid), {
           email: result.user.email,
           displayName: result.user.displayName,
+          name: result.user.displayName,
+          photoURL: result.user.photoURL,
           role: { type: 'user' },
           createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         });
       }
     } catch (err) {
@@ -108,14 +142,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await setDoc(doc(db, 'users', result.user.uid), {
         email,
         displayName: name,
+        name,
         role: { type: 'user' },
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       });
       
       // Update Firebase user profile
-      await result.user.updateProfile({
-        displayName: name,
-      });
+      if (result.user) {
+        await updateDoc(doc(db, 'users', result.user.uid), {
+          displayName: name,
+          name
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create account');
       throw err;
@@ -146,7 +185,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setError(null);
       const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, { role });
+      await updateDoc(userRef, { 
+        role,
+        updatedAt: new Date().toISOString()
+      });
       
       // Update local user state if it's the current user
       if (user && user.uid === userId) {
@@ -170,6 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await setDoc(doc(db, 'artistProfiles', user.uid), {
         userId: user.uid,
         displayName: user.displayName,
+        name: user.name || user.displayName,
         email: user.email,
         bio: '',
         specialties: [],
@@ -203,12 +246,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 }

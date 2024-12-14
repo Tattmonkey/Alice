@@ -1,185 +1,233 @@
-import React from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { 
-  ShoppingCart, 
-  User, 
-  LogOut, 
-  Settings, 
-  MessageCircle,
-  Palette,
-  ChevronDown,
-  Sun,
-  Moon
+  Menu,
+  X,
+  User,
+  LogOut,
+  Settings,
+  MessageSquare,
+  Image as ImageIcon,
+  Calendar,
+  Palette
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useMessaging } from '../contexts/MessagingContext';
 import Logo from './Logo';
-import ThemeToggle from './ThemeToggle';
 
-interface NavbarProps {
-  onLoginClick: () => void;
-  onSignUpClick: () => void;
-}
-
-export default function Navbar({ onLoginClick, onSignUpClick }: NavbarProps) {
+export default function Navbar() {
   const { user, logout } = useAuth();
-  const { threads } = useMessaging();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [showUserMenu, setShowUserMenu] = React.useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   const handleLogout = async () => {
     try {
       await logout();
       navigate('/');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Failed to log out:', error);
     }
   };
 
-  // Calculate total unread messages
-  const totalUnreadMessages = React.useMemo(() => {
-    if (!user || !threads) return 0;
-    return threads.reduce((total, thread) => total + (thread.unreadCount[user.id] || 0), 0);
-  }, [threads, user]);
-
-  const isActive = (path: string) => location.pathname === path;
+  const isArtist = user?.role?.type === 'artist';
+  const isAdmin = user?.role?.type === 'admin';
 
   return (
-    <nav className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav className="bg-white dark:bg-gray-900 shadow-lg">
+      <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between h-16">
-          <div className="flex items-center">
+          {/* Logo and main nav */}
+          <div className="flex">
             <Link to="/" className="flex-shrink-0 flex items-center">
               <Logo className="h-8 w-auto" />
             </Link>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <Link
                 to="/artists"
-                className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
-                  isActive('/artists')
-                    ? 'border-b-2 border-purple-500 text-gray-900 dark:text-white'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
+                className="text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 
+                  px-3 py-2 text-sm font-medium"
               >
                 Artists
               </Link>
               <Link
                 to="/shop"
-                className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
-                  isActive('/shop')
-                    ? 'border-b-2 border-purple-500 text-gray-900 dark:text-white'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
+                className="text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 
+                  px-3 py-2 text-sm font-medium"
               >
                 Shop
               </Link>
               <Link
                 to="/blog"
-                className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
-                  isActive('/blog')
-                    ? 'border-b-2 border-purple-500 text-gray-900 dark:text-white'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
+                className="text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 
+                  px-3 py-2 text-sm font-medium"
               >
                 Blog
               </Link>
             </div>
           </div>
-          <div className="flex items-center">
-            <ThemeToggle />
-            
+
+          {/* User menu */}
+          <div className="hidden sm:ml-6 sm:flex sm:items-center">
             {user ? (
-              <>
-                <Link
-                  to="/cart"
-                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                >
-                  <ShoppingCart className="h-6 w-6" />
-                </Link>
-
-                <Link
-                  to="/messages"
-                  className="relative p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                >
-                  <MessageCircle className="h-6 w-6" />
-                  {totalUnreadMessages > 0 && (
-                    <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-purple-500 text-xs font-medium text-white">
-                      {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
-                    </span>
-                  )}
-                </Link>
-
-                <div className="relative ml-3">
-                  <button
-                    onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center">
-                      <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
-                        {user.name.charAt(0)}
-                      </span>
-                    </div>
-                    <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  </button>
-
-                  {showUserMenu && (
-                    <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5">
-                      <div className="py-1">
-                        <Link
-                          to="/dashboard"
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                        >
-                          <User className="h-4 w-4" />
-                          Dashboard
-                        </Link>
-                        {user.role?.type === 'artist' && (
-                          <Link
-                            to="/artist/dashboard"
-                            className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                          >
-                            <Palette className="h-4 w-4" />
-                            Artist Dashboard
-                          </Link>
-                        )}
-                        <Link
-                          to="/settings"
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                        >
-                          <Settings className="h-4 w-4" />
-                          Settings
-                        </Link>
-                        <button
-                          onClick={handleLogout}
-                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                        >
-                          <LogOut className="h-4 w-4" />
-                          Logout
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center gap-2">
+              <div className="relative">
                 <button
-                  onClick={onLoginClick}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white"
+                  onClick={() => setShowDropdown(!showDropdown)}
+                  className="flex items-center space-x-2 text-gray-900 dark:text-white hover:text-purple-600 
+                    dark:hover:text-purple-400 focus:outline-none"
+                >
+                  {user.photoURL ? (
+                    <img
+                      src={user.photoURL}
+                      alt={user.displayName || user.name || 'User'}
+                      className="h-8 w-8 rounded-full"
+                    />
+                  ) : (
+                    <User className="h-6 w-6" />
+                  )}
+                </button>
+
+                {showDropdown && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 
+                      ring-1 ring-black ring-opacity-5"
+                  >
+                    <Link
+                      to="/dashboard"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
+                        hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      <User className="mr-3 h-4 w-4" />
+                      Dashboard
+                    </Link>
+
+                    {isArtist && (
+                      <Link
+                        to="/artist/dashboard"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
+                          hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <Palette className="mr-3 h-4 w-4" />
+                        Artist Dashboard
+                      </Link>
+                    )}
+
+                    <Link
+                      to="/messages"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
+                        hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      <MessageSquare className="mr-3 h-4 w-4" />
+                      Messages
+                    </Link>
+
+                    <Link
+                      to="/gallery"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
+                        hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      <ImageIcon className="mr-3 h-4 w-4" />
+                      Gallery
+                    </Link>
+
+                    <Link
+                      to="/bookings"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
+                        hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      <Calendar className="mr-3 h-4 w-4" />
+                      Bookings
+                    </Link>
+
+                    <Link
+                      to="/settings"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
+                        hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      <Settings className="mr-3 h-4 w-4" />
+                      Settings
+                    </Link>
+
+                    <button
+                      onClick={handleLogout}
+                      className="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
+                        hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      <LogOut className="mr-3 h-4 w-4" />
+                      Logout
+                    </button>
+                  </motion.div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center space-x-4">
+                <Link
+                  to="/login"
+                  className="text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 
+                    px-3 py-2 text-sm font-medium"
                 >
                   Login
-                </button>
-                <button
-                  onClick={onSignUpClick}
-                  className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:focus:ring-offset-gray-900"
+                </Link>
+                <Link
+                  to="/signup"
+                  className="bg-purple-600 text-white hover:bg-purple-700 px-4 py-2 rounded-lg text-sm font-medium"
                 >
                   Sign Up
-                </button>
+                </Link>
               </div>
             )}
           </div>
+
+          {/* Mobile menu button */}
+          <div className="flex items-center sm:hidden">
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 
+                hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"
+            >
+              {isOpen ? (
+                <X className="block h-6 w-6" />
+              ) : (
+                <Menu className="block h-6 w-6" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Mobile menu */}
+      <motion.div
+        initial={false}
+        animate={isOpen ? { height: 'auto' } : { height: 0 }}
+        className="sm:hidden overflow-hidden"
+      >
+        <div className="px-2 pt-2 pb-3 space-y-1">
+          <Link
+            to="/artists"
+            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 
+              hover:text-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            Artists
+          </Link>
+          <Link
+            to="/shop"
+            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 
+              hover:text-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            Shop
+          </Link>
+          <Link
+            to="/blog"
+            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 
+              hover:text-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            Blog
+          </Link>
+        </div>
+      </motion.div>
     </nav>
   );
 }
