@@ -10,7 +10,7 @@ import {
   Filter
 } from 'lucide-react';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { User } from '../../contexts/AuthContext';
 

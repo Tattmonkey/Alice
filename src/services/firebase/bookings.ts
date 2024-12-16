@@ -31,6 +31,20 @@ const ARTISTS_COLLECTION = 'artists';
 const USERS_COLLECTION = 'users';
 const BATCH_SIZE = 10;
 
+type CreateBookingData = Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> & {
+  artistId: string;
+  userId: string;
+  serviceId: string;
+  status: BookingStatus;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  price: number;
+  deposit: number;
+  depositPaid: boolean;
+};
+
 // Booking CRUD Operations
 export const getBookingsByArtist = async (
   artistId: string, 
@@ -116,7 +130,7 @@ export const getBookingById = async (bookingId: string): Promise<Booking | null>
   }
 };
 
-export const createBooking = async (booking: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>) => {
+export const createBooking = async (booking: CreateBookingData) => {
   try {
     // Check artist availability first
     const isAvailable = await checkArtistAvailability(
@@ -213,7 +227,7 @@ export const deleteBooking = async (bookingId: string) => {
 // Availability Management
 export const checkArtistAvailability = async (
   artistId: string,
-  date: Date,
+  date: string,
   startTime: string,
   endTime: string
 ): Promise<boolean> => {
@@ -227,21 +241,21 @@ export const checkArtistAvailability = async (
     const availability: ArtistAvailability = artistDoc.data().availability;
 
     // Check if date is blocked
-    if (availability.blockedDates.includes(date)) {
+    if (availability.blockedDates?.includes(date)) {
       return false;
     }
 
     // Check regular working hours
-    const dayOfWeek = date.getDay();
-    const regularHours = availability.regularHours.find(h => h.day === dayOfWeek);
+    const dayOfWeek = new Date(date).getDay();
+    const regularHours = availability.regularHours?.find(h => h.day === dayOfWeek);
     
     if (!regularHours || !regularHours.isAvailable) {
       return false;
     }
 
     // Check custom availability
-    const customSlot = availability.customAvailability.find(
-      slot => slot.date.getTime() === date.getTime()
+    const customSlot = availability.customAvailability?.find(
+      slot => new Date(slot.date).getTime() === new Date(date).getTime()
     );
 
     if (customSlot) {

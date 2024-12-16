@@ -19,7 +19,7 @@ import {
   QueryDocumentSnapshot
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '../lib/firebase';
+import { db, storage } from '../config/firebase';
 import { useAuth } from './AuthContext';
 import { GalleryItem, GalleryFilter, GalleryStats, GalleryContextType } from '../types/gallery';
 import toast from 'react-hot-toast';

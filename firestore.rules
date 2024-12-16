@@ -1,182 +1,95 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
     // Helper functions
-    function isSignedIn() {
+    function isAuthenticated() {
       return request.auth != null;
     }
     
     function isAdmin() {
-      return isSignedIn() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role.type == 'admin';
+      return isAuthenticated() && 
+        (request.auth.token.admin == true || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role.type == 'admin'));
     }
     
     function isArtist() {
-      return isSignedIn() && 
+      return isAuthenticated() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role.type == 'artist';
     }
-    
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-    
-    function isParticipant(participants) {
-      return isSignedIn() && request.auth.uid in participants;
+
+    // Site settings collection (logo, favicon, etc.)
+    match /settings/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // User profiles
-    match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && (isOwner(userId) || isAdmin());
-      allow delete: if isAdmin();
-      
-      // User's private data
-      match /private/{document=**} {
-        allow read, write: if isOwner(userId);
-      }
-    }
-
-    // Messages
-    match /messages/{messageId} {
-      allow create: if isSignedIn() && 
-        request.resource.data.senderId == request.auth.uid &&
-        isParticipant(get(/databases/$(database)/documents/messageThreads/$(request.resource.data.threadId)).data.participants);
-      
-      allow read: if isSignedIn() && 
-        isParticipant(get(/databases/$(database)/documents/messageThreads/$(resource.data.threadId)).data.participants);
-      
-      allow update: if isSignedIn() && 
-        (resource.data.senderId == request.auth.uid || 
-         resource.data.recipientId == request.auth.uid);
-      
-      allow delete: if isSignedIn() && 
-        resource.data.senderId == request.auth.uid;
-    }
-
-    // Message threads
-    match /messageThreads/{threadId} {
-      allow create: if isSignedIn() && 
-        request.resource.data.participants.hasAll([request.auth.uid]);
-      
-      allow read: if isSignedIn() && 
-        resource.data.participants.hasAny([request.auth.uid]);
-      
-      allow update: if isSignedIn() && 
-        resource.data.participants.hasAny([request.auth.uid]) &&
-        (!request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['participants']));
-      
-      allow delete: if false; // Threads should never be deleted, only archived
-    }
-
-    // Gallery items
-    match /galleryItems/{itemId} {
-      allow read: if resource.data.isPublic || 
-        (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow create: if isSignedIn() && 
-        request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isSignedIn() && 
-        resource.data.userId == request.auth.uid;
-    }
-
-    // Bookings
-    match /bookings/{bookingId} {
-      // Users can read their own bookings
-      // Artists can read bookings for their services
-      allow read: if isSignedIn() && (
-        resource.data.userId == request.auth.uid ||
-        resource.data.artistId == request.auth.uid ||
-        isAdmin()
-      );
-      
-      // Users can create bookings
-      allow create: if isSignedIn() && 
-        request.resource.data.userId == request.auth.uid;
-      
-      // Users can update their own bookings (e.g., cancel)
-      // Artists can update bookings for their services (e.g., confirm/complete)
-      allow update: if isSignedIn() && (
-        resource.data.userId == request.auth.uid ||
-        resource.data.artistId == request.auth.uid ||
-        isAdmin()
-      );
-      
-      // Only admins can delete bookings
+    // Artists collection
+    match /artists/{artistId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() && (request.auth.uid == artistId || isAdmin());
       allow delete: if isAdmin();
     }
 
-    // Artist Services
-    match /artistServices/{serviceId} {
-      // Anyone can read services
-      allow read: if true;
-      
-      // Only the artist who owns the service or admin can create/update/delete
-      allow create: if isSignedIn() && (
-        request.resource.data.artistId == request.auth.uid ||
-        isAdmin()
-      );
-      
-      allow update, delete: if isSignedIn() && (
-        resource.data.artistId == request.auth.uid ||
-        isAdmin()
-      );
-    }
-
-    // Artist Availability
-    match /artistAvailability/{availabilityId} {
-      // Anyone can read availability
-      allow read: if true;
-      
-      // Only the artist or admin can create/update/delete
-      allow create: if isSignedIn() && (
-        request.resource.data.artistId == request.auth.uid ||
-        isAdmin()
-      );
-      
-      allow update, delete: if isSignedIn() && (
-        resource.data.artistId == request.auth.uid ||
-        isAdmin()
-      );
-    }
-
-    // Products
+    // Products collection
     match /products/{productId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Orders
-    match /orders/{orderId} {
-      allow read: if isSignedIn() && 
-        (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && 
-        request.resource.data.userId == request.auth.uid;
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // Blog posts
-    match /blog/{postId} {
+    // Blog posts collection
+    match /posts/{postId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Artist portfolios
-    match /portfolios/{artistId} {
-      allow read: if true;
-      allow write: if isSignedIn() && 
-        (request.auth.uid == artistId || isAdmin());
+    // Orders collection
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.userId || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.userId || 
+        isAdmin()
+      );
+      allow delete: if isAdmin();
     }
 
-    // Reviews
-    match /reviews/{reviewId} {
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Designs collection
+    match /designs/{designId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.userId || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.userId || 
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Categories collection
+    match /categories/{categoryId} {
       allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Gallery collection
+    match /gallery/{imageId} {
+      allow read: if true;
+      allow write: if isAdmin() || isArtist();
     }
   }
 }

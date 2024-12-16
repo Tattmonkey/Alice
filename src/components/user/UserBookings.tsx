@@ -16,7 +16,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Booking, ArtistService } from '../../types/booking';
 import LoadingScreen from '../LoadingScreen';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { db } from '../../config/firebase';
 
 interface BookingWithService extends Booking {
   serviceDetails?: ArtistService;

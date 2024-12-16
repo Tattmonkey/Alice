@@ -14,6 +14,18 @@ export default defineConfig(({ command, mode }) => {
         '@': resolve(__dirname, './src')
       }
     },
+    define: {
+      __FIREBASE_CONFIG__: {
+        apiKey: env.VITE_FIREBASE_API_KEY,
+        authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: env.VITE_FIREBASE_APP_ID,
+        measurementId: env.VITE_FIREBASE_MEASUREMENT_ID
+      },
+      __APP_VERSION__: JSON.stringify(process.env.npm_package_version)
+    },
     server: {
       port: 5173,
       host: true,
@@ -28,7 +40,6 @@ export default defineConfig(({ command, mode }) => {
     build: {
       outDir: 'dist',
       sourcemap: mode !== 'production',
-      // Optimize chunks
       rollupOptions: {
         output: {
           manualChunks: {
@@ -39,12 +50,10 @@ export default defineConfig(({ command, mode }) => {
           }
         }
       },
-      // Optimize dependencies
       commonjsOptions: {
         include: [/node_modules/],
         extensions: ['.js', '.cjs']
       },
-      // Minimize output
       minify: 'terser',
       terserOptions: {
         compress: {
@@ -52,7 +61,6 @@ export default defineConfig(({ command, mode }) => {
           drop_debugger: mode === 'production'
         }
       },
-      // Split chunks
       chunkSizeWarningLimit: 1000
     },
     optimizeDeps: {
@@ -72,10 +80,6 @@ export default defineConfig(({ command, mode }) => {
         '@hookform/resolvers/zod',
         'zod'
       ]
-    },
-    // Environment variables
-    define: {
-      __APP_VERSION__: JSON.stringify(process.env.npm_package_version)
     }
   };
 });

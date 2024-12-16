@@ -1,55 +1,12 @@
 rules_version = '2';
 
+// Craft rules based on data in your Firestore database
+// allow write: if firestore.get(
+//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    function isAdmin() {
-      return isSignedIn() && 
-        firestore.exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        firestore.get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role.type == 'admin';
-    }
-    
-    function isThreadParticipant(threadId) {
-      return isSignedIn() && 
-        firestore.exists(/databases/$(database)/documents/messageThreads/$(threadId)) &&
-        request.auth.uid in firestore.get(/databases/$(database)/documents/messageThreads/$(threadId)).data.participants;
-    }
-
-    // Message attachments
-    match /message-attachments/{threadId}/{fileName} {
-      allow read: if isThreadParticipant(threadId);
-      allow create: if isThreadParticipant(threadId) && 
-        request.resource.size < 10 * 1024 * 1024 && // 10MB max
-        request.resource.contentType.matches('image/.*|application/pdf|application/msword|application/vnd.openxmlformats-officedocument.wordprocessingml.document|text/plain');
-      allow delete: if isThreadParticipant(threadId) || isAdmin();
-    }
-
-    // User avatars
-    match /avatars/{userId} {
-      allow read: if true;
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin()) &&
-        request.resource.size < 5 * 1024 * 1024 && // 5MB max
-        request.resource.contentType.matches('image/.*');
-    }
-
-    // Artist portfolio images
-    match /portfolio/{artistId}/{fileName} {
-      allow read: if true;
-      allow write: if isSignedIn() && (request.auth.uid == artistId || isAdmin()) &&
-        request.resource.size < 10 * 1024 * 1024 && // 10MB max
-        request.resource.contentType.matches('image/.*');
-    }
-
-    // Product images
-    match /products/{productId}/{fileName} {
-      allow read: if true;
-      allow write: if isAdmin() &&
-        request.resource.size < 10 * 1024 * 1024 && // 10MB max
-        request.resource.contentType.matches('image/.*');
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }

@@ -14,7 +14,7 @@ import {
   writeBatch,
   increment
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
 import { Message, MessageThread, ThreadParticipant, MessageStatus, MessageAttachment } from '../types/messages';
 import { uploadMultipleAttachments, deleteMessageAttachment } from '../utils/storage';

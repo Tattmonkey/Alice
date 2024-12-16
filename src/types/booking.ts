@@ -66,16 +66,27 @@ export type ServiceCategory =
   | 'touchup'
   | 'custom';
 
+export interface WorkingHours {
+  day: number; // 0-6, 0 is Sunday
+  startTime: string; // HH:mm format
+  endTime: string; // HH:mm format
+  isAvailable: boolean;
+}
+
+export interface CustomTimeSlot {
+  date: string;
+  startTime: string;
+  endTime: string;
+  isAvailable: boolean;
+}
+
 export interface ArtistAvailability {
   id: string;
   artistId: string;
-  dayOfWeek: number; // 0-6, 0 is Sunday
-  startTime: string; // HH:mm format
-  endTime: string; // HH:mm format
-  breakStart?: string;
-  breakEnd?: string;
+  regularHours: WorkingHours[];
+  blockedDates: string[];
+  customAvailability: CustomTimeSlot[];
   maxBookings?: number;
-  isAvailable: boolean;
 }
 
 export interface TimeSlot {

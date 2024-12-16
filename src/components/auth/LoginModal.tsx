@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, LogIn, Loader2, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -25,9 +25,18 @@ export default function LoginModal({ isOpen, onClose, onSwitchToSignUp, onResetP
   const { signIn, signInWithGoogle } = useAuth();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors }, reset } = useForm<FormData>({
     resolver: zodResolver(schema)
   });
+
+  useEffect(() => {
+    const handleClick = () => {
+      console.log('Window clicked');
+    };
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, []);
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -50,8 +59,8 @@ export default function LoginModal({ isOpen, onClose, onSwitchToSignUp, onResetP
       await signInWithGoogle();
       onClose();
     } catch (error) {
-      // Error handling is done in AuthContext
-      console.error('Google sign in error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to sign in with Google');
+      console.error('Google sign-in error:', error);
     } finally {
       setGoogleLoading(false);
     }
@@ -83,6 +92,12 @@ export default function LoginModal({ isOpen, onClose, onSwitchToSignUp, onResetP
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {error && (
+              <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-200 dark:text-red-800" role="alert">
+                {error}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <div>

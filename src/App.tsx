@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { MessagingProvider } from './contexts/MessagingContext';
@@ -6,6 +6,10 @@ import { GalleryProvider } from './contexts/GalleryContext';
 import { BookingProvider } from './contexts/BookingContext';
 import { User } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
+import LoginModal from './components/auth/LoginModal';
+import SignUpModal from './components/auth/SignUpModal';
+import ResetPasswordModal from './components/auth/ResetPasswordModal';
 import Home from './pages/Home';
 import Artists from './pages/Artists';
 import Shop from './pages/Shop';
@@ -14,10 +18,6 @@ import Blog from './pages/Blog';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Orders from './pages/Orders';
-import Footer from './components/Footer';
-import LoginModal from './components/auth/LoginModal';
-import SignUpModal from './components/auth/SignUpModal';
-import ResetPasswordModal from './components/auth/ResetPasswordModal';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import RefundPolicy from './pages/RefundPolicy';
@@ -60,13 +60,35 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => (
 );
 
 export default function App() {
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSignUpModalOpen, setIsSignUpModalOpen] = useState(false);
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+
+  const handleSwitchToSignUp = () => {
+    setIsLoginModalOpen(false);
+    setIsSignUpModalOpen(true);
+  };
+
+  const handleSwitchToLogin = () => {
+    setIsSignUpModalOpen(false);
+    setIsLoginModalOpen(true);
+  };
+
+  const handleResetPassword = () => {
+    setIsLoginModalOpen(false);
+    setIsResetPasswordModalOpen(true);
+  };
+
   return (
     <AuthProvider>
       <GalleryProvider>
         <BookingProvider>
           <MessagingProvider>
             <div className="min-h-screen bg-purple-50 dark:bg-[#0f0616] transition-colors flex flex-col">
-              <Navbar />
+              <Navbar 
+                onOpenLoginModal={() => setIsLoginModalOpen(true)}
+                onOpenSignUpModal={() => setIsSignUpModalOpen(true)}
+              />
               
               <main className="flex-1">
                 <Routes>
@@ -213,6 +235,27 @@ export default function App() {
 
               <Footer />
             </div>
+
+            <LoginModal 
+              isOpen={isLoginModalOpen}
+              onClose={() => setIsLoginModalOpen(false)}
+              onSwitchToSignUp={handleSwitchToSignUp}
+              onResetPassword={handleResetPassword}
+            />
+            <SignUpModal
+              isOpen={isSignUpModalOpen}
+              onClose={() => setIsSignUpModalOpen(false)}
+              onSwitchToLogin={handleSwitchToLogin}
+            />
+            <ResetPasswordModal
+              isOpen={isResetPasswordModalOpen}
+              onClose={() => setIsResetPasswordModalOpen(false)}
+              onSwitchToLogin={() => {
+                setIsResetPasswordModalOpen(false);
+                setIsLoginModalOpen(true);
+              }}
+            />
+
           </MessagingProvider>
         </BookingProvider>
       </GalleryProvider>

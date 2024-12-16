@@ -16,7 +16,7 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '../lib/firebase';
+import { db, storage } from '../config/firebase';
 import { useAuth } from './AuthContext';
 import { 
   Booking, 
@@ -291,15 +291,80 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
         const dateStr = format(currentDate, 'yyyy-MM-dd');
         
         // Find availability settings for this day
-        const dayAvailability = availabilitySettings.find(
-          a => a.dayOfWeek === dayOfWeek
+        const artistAvailability = availabilitySettings[0]; // Assuming one availability record per artist
+        if (!artistAvailability) continue;
+
+        // Check if date is blocked
+        if (artistAvailability.blockedDates.includes(dateStr)) {
+          schedule.push({
+            date: dateStr,
+            slots: [],
+            isAvailable: false,
+            totalBookings: 0
+          });
+          currentDate = addDays(currentDate, 1);
+          continue;
+        }
+
+        // Check for custom availability
+        const customSlot = artistAvailability.customAvailability.find(
+          slot => slot.date === dateStr
         );
 
-        if (dayAvailability && dayAvailability.isAvailable) {
-          // Generate time slots
+        // Find regular hours for this day
+        const regularHours = artistAvailability.regularHours.find(
+          h => h.day === dayOfWeek
+        );
+
+        if (customSlot) {
+          // Use custom slot if available
+          if (customSlot.isAvailable) {
+            const slots: TimeSlot[] = [];
+            let slotStart = parse(customSlot.startTime, 'HH:mm', currentDate);
+            const slotEnd = parse(customSlot.endTime, 'HH:mm', currentDate);
+
+            while (slotStart < slotEnd) {
+              const startTimeStr = format(slotStart, 'HH:mm');
+              const endTimeStr = format(addDays(slotStart, 30), 'HH:mm');
+
+              // Check if slot conflicts with existing bookings
+              const conflictingBooking = existingBookings.find(booking => 
+                booking.date === dateStr &&
+                isWithinInterval(parse(startTimeStr, 'HH:mm', currentDate), {
+                  start: parse(booking.startTime, 'HH:mm', currentDate),
+                  end: parse(booking.endTime, 'HH:mm', currentDate)
+                })
+              );
+
+              slots.push({
+                startTime: startTimeStr,
+                endTime: endTimeStr,
+                available: !conflictingBooking,
+                existingBooking: conflictingBooking
+              });
+
+              slotStart = addDays(slotStart, 30);
+            }
+
+            schedule.push({
+              date: dateStr,
+              slots,
+              isAvailable: true,
+              totalBookings: existingBookings.filter(b => b.date === dateStr).length
+            });
+          } else {
+            schedule.push({
+              date: dateStr,
+              slots: [],
+              isAvailable: false,
+              totalBookings: 0
+            });
+          }
+        } else if (regularHours && regularHours.isAvailable) {
+          // Use regular hours
           const slots: TimeSlot[] = [];
-          let slotStart = parse(dayAvailability.startTime, 'HH:mm', currentDate);
-          const slotEnd = parse(dayAvailability.endTime, 'HH:mm', currentDate);
+          let slotStart = parse(regularHours.startTime, 'HH:mm', currentDate);
+          const slotEnd = parse(regularHours.endTime, 'HH:mm', currentDate);
 
           while (slotStart < slotEnd) {
             const startTimeStr = format(slotStart, 'HH:mm');

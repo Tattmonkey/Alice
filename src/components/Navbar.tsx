@@ -15,7 +15,12 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import Logo from './Logo';
 
-export default function Navbar() {
+interface NavbarProps {
+  onOpenLoginModal: () => void;
+  onOpenSignUpModal: () => void;
+}
+
+export default function Navbar({ onOpenLoginModal, onOpenSignUpModal }: NavbarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -34,11 +39,11 @@ export default function Navbar() {
   const isAdmin = user?.role?.type === 'admin';
 
   return (
-    <nav className="bg-white dark:bg-gray-900 shadow-lg">
+    <nav className="bg-white dark:bg-gray-900 shadow-lg fixed w-full top-0 z-50">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between h-16">
           {/* Logo and main nav */}
-          <div className="flex">
+          <div className="flex items-center">
             <Link to="/" className="flex-shrink-0 flex items-center">
               <Logo className="h-8 w-auto" />
             </Link>
@@ -73,18 +78,20 @@ export default function Navbar() {
               <div className="relative">
                 <button
                   onClick={() => setShowDropdown(!showDropdown)}
-                  className="flex items-center space-x-2 text-gray-900 dark:text-white hover:text-purple-600 
-                    dark:hover:text-purple-400 focus:outline-none"
+                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
                   {user.photoURL ? (
                     <img
                       src={user.photoURL}
-                      alt={user.displayName || user.name || 'User'}
+                      alt={user.displayName || 'User'}
                       className="h-8 w-8 rounded-full"
                     />
                   ) : (
-                    <User className="h-6 w-6" />
+                    <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                      <User className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    </div>
                   )}
+                  <span className="text-gray-700 dark:text-gray-300">{user.displayName || 'User'}</span>
                 </button>
 
                 {showDropdown && (
@@ -164,19 +171,19 @@ export default function Navbar() {
               </div>
             ) : (
               <div className="flex items-center space-x-4">
-                <Link
-                  to="/login"
+                <button
+                  onClick={() => onOpenLoginModal()}
                   className="text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 
                     px-3 py-2 text-sm font-medium"
                 >
                   Login
-                </Link>
-                <Link
-                  to="/signup"
+                </button>
+                <button
+                  onClick={() => onOpenSignUpModal()}
                   className="bg-purple-600 text-white hover:bg-purple-700 px-4 py-2 rounded-lg text-sm font-medium"
                 >
                   Sign Up
-                </Link>
+                </button>
               </div>
             )}
           </div>
@@ -185,14 +192,9 @@ export default function Navbar() {
           <div className="flex items-center sm:hidden">
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 
-                hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"
+              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"
             >
-              {isOpen ? (
-                <X className="block h-6 w-6" />
-              ) : (
-                <Menu className="block h-6 w-6" />
-              )}
+              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
         </div>

@@ -1,12 +1,16 @@
 {
   "projects": {
-    "default": "alice-tattoo-studio"
+    "default": "alice-tattoos"
   },
   "targets": {
-    "alice-tattoo-studio": {
+    "alice-tattoos": {
       "hosting": {
-        "production": ["alice-tattoo-studio"],
-        "staging": ["alice-tattoo-studio-staging"]
+        "production": [
+          "alice-tattoos"
+        ],
+        "staging": [
+          "alice-tattoos-staging"
+        ]
       }
     }
   }

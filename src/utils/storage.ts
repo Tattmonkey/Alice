@@ -1,5 +1,5 @@
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from '../lib/firebase';
+import { storage } from '../config/firebase';
 import { MessageAttachment } from '../types/messages';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
