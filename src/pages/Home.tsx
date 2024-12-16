@@ -44,14 +44,14 @@ export default function Home() {
         }} 
       />
 
-      <div className="relative w-full max-w-7xl mx-auto px-4 py-8 md:py-12">
+      <div className="relative w-full max-w-7xl mx-auto px-4 pt-24 pb-12 md:pt-28 md:pb-16">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
           <motion.h1 
-            className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 animated-title"
+            className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 md:mb-8 bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-purple-400 dark:to-indigo-400 leading-tight"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
