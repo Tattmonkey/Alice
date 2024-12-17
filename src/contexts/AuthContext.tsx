@@ -9,10 +9,9 @@ import {
   getRedirectResult,
   User as FirebaseUser,
   sendPasswordResetEmail,
-  AuthError,
-  deleteDoc
+  AuthError
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../config/firebase';
 import { showSuccessToast, showErrorToast } from '../utils/toast';
 import { getCurrentUser, checkUserRole } from '../utils/auth';
