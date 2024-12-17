@@ -9,7 +9,8 @@ import {
   getRedirectResult,
   User as FirebaseUser,
   sendPasswordResetEmail,
-  AuthError
+  AuthError,
+  deleteDoc
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../config/firebase';
@@ -37,6 +38,8 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  convertToArtist: () => Promise<void>;
+  revertToUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -49,7 +52,7 @@ export const useAuth = () => {
   return context;
 };
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -135,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         showErrorToast('Sign-in was cancelled');
       } else if ((error as AuthError)?.code === 'auth/internal-error') {
         showErrorToast('An error occurred. Please try again in a few moments.');
+
         // Log additional details for debugging
         console.error('[Auth] Internal error details:', {
           authInstance: !!auth,
@@ -200,6 +204,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const convertToArtist = async () => {
+    if (!user) throw new Error('No user logged in');
+    
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const artistRef = doc(db, 'artists', user.uid);
+      
+      // Update user role
+      await setDoc(userRef, {
+        role: {
+          type: 'artist',
+          verified: false,
+          createdAt: new Date().toISOString()
+        },
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // Create artist profile
+      await setDoc(artistRef, {
+        userId: user.uid,
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+        verified: false
+      }, { merge: true });
+
+      // Update local user state
+      setUser(prev => prev ? {
+        ...prev,
+        role: {
+          type: 'artist',
+          verified: false,
+          createdAt: new Date().toISOString()
+        }
+      } : null);
+
+      showSuccessToast('Successfully converted to artist account');
+    } catch (error) {
+      showErrorToast('Failed to convert account');
+      throw error;
+    }
+  };
+
+  const revertToUser = async () => {
+    if (!user) throw new Error('No user logged in');
+    
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const artistRef = doc(db, 'artists', user.uid);
+      
+      // Update user role
+      await setDoc(userRef, {
+        role: {
+          type: 'user',
+          verified: true,
+          createdAt: new Date().toISOString()
+        },
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // Delete artist profile
+      await deleteDoc(artistRef);
+
+      // Update local user state
+      setUser(prev => prev ? {
+        ...prev,
+        role: {
+          type: 'user',
+          verified: true,
+          createdAt: new Date().toISOString()
+        }
+      } : null);
+
+      showSuccessToast('Successfully reverted to user account');
+    } catch (error) {
+      showErrorToast('Failed to revert account');
+      throw error;
+    }
+  };
+
   const value = {
     user,
     loading,
@@ -209,6 +292,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signInWithGoogle,
     logout,
     resetPassword,
+    convertToArtist,
+    revertToUser
   };
 
   return (
@@ -216,4 +301,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {!loading && children}
     </AuthContext.Provider>
   );
-}
+};
