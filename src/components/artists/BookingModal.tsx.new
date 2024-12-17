@@ -1,0 +1,20 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Calendar,
+  Clock,
+  CreditCard,
+  FileText,
+  Image as ImageIcon,
+  X,
+  ChevronRight,
+  ChevronLeft,
+  Check,
+  AlertCircle,
+  Upload
+} from 'lucide-react';
+import { format, addMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { useBooking } from '../../contexts/BookingContext';
+import { useAuth } from '../../hooks/useAuth';
+import { ArtistService, DaySchedule, TimeSlot } from '../../types/booking';
+import LoadingScreen from '../LoadingScreen';

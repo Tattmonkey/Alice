@@ -12,7 +12,7 @@ import {
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { User } from '../../contexts/AuthContext';
+import { User } from '../../types';
 
 interface ExtendedUser extends Omit<User, 'role'> {
   role: {

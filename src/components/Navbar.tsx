@@ -8,12 +8,13 @@ import {
   LogOut,
   Settings,
   MessageSquare,
-  Image as ImageIcon,
+  ImageIcon,
   Calendar,
   Palette
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Logo from './Logo';
+import UserAvatar from './UserAvatar';
 
 interface NavbarProps {
   onOpenLoginModal: () => void;
@@ -51,21 +52,21 @@ export default function Navbar({ onOpenLoginModal, onOpenSignUpModal }: NavbarPr
               <Link
                 to="/artists"
                 className="text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 
-                  px-3 py-2 text-sm font-medium"
+                  px-3 py-2 text-sm font-medium transition-colors"
               >
                 Artists
               </Link>
               <Link
                 to="/shop"
                 className="text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 
-                  px-3 py-2 text-sm font-medium"
+                  px-3 py-2 text-sm font-medium transition-colors"
               >
                 Shop
               </Link>
               <Link
                 to="/blog"
                 className="text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 
-                  px-3 py-2 text-sm font-medium"
+                  px-3 py-2 text-sm font-medium transition-colors"
               >
                 Blog
               </Link>
@@ -78,20 +79,12 @@ export default function Navbar({ onOpenLoginModal, onOpenSignUpModal }: NavbarPr
               <div className="relative">
                 <button
                   onClick={() => setShowDropdown(!showDropdown)}
-                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
-                  {user.photoURL ? (
-                    <img
-                      src={user.photoURL}
-                      alt={user.displayName || 'User'}
-                      className="h-8 w-8 rounded-full"
-                    />
-                  ) : (
-                    <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                      <User className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                    </div>
-                  )}
-                  <span className="text-gray-700 dark:text-gray-300">{user.displayName || 'User'}</span>
+                  <div className="flex items-center gap-2">
+                    <UserAvatar size="sm" showUpload={false} />
+                    <span className="text-gray-700 dark:text-gray-300 font-medium">{user.name || 'User'}</span>
+                  </div>
                 </button>
 
                 {showDropdown && (
@@ -100,89 +93,68 @@ export default function Navbar({ onOpenLoginModal, onOpenSignUpModal }: NavbarPr
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 
-                      ring-1 ring-black ring-opacity-5"
+                      ring-1 ring-black ring-opacity-5 focus:outline-none"
                   >
                     <Link
                       to="/dashboard"
+                      onClick={() => setShowDropdown(false)}
                       className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
-                        hover:bg-gray-100 dark:hover:bg-gray-700"
+                        hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                     >
                       <User className="mr-3 h-4 w-4" />
-                      Dashboard
+                      Profile
                     </Link>
-
                     {isArtist && (
-                      <Link
-                        to="/artist/dashboard"
-                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
-                          hover:bg-gray-100 dark:hover:bg-gray-700"
-                      >
-                        <Palette className="mr-3 h-4 w-4" />
-                        Artist Dashboard
-                      </Link>
+                      <>
+                        <Link
+                          to="/dashboard/bookings"
+                          onClick={() => setShowDropdown(false)}
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
+                            hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                        >
+                          <Calendar className="mr-3 h-4 w-4" />
+                          Bookings
+                        </Link>
+                        <Link
+                          to="/dashboard/portfolio"
+                          onClick={() => setShowDropdown(false)}
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
+                            hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                        >
+                          <ImageIcon className="mr-3 h-4 w-4" />
+                          Portfolio
+                        </Link>
+                      </>
                     )}
-
-                    <Link
-                      to="/messages"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
-                        hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                      <MessageSquare className="mr-3 h-4 w-4" />
-                      Messages
-                    </Link>
-
-                    <Link
-                      to="/gallery"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
-                        hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                      <ImageIcon className="mr-3 h-4 w-4" />
-                      Gallery
-                    </Link>
-
-                    <Link
-                      to="/bookings"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
-                        hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                      <Calendar className="mr-3 h-4 w-4" />
-                      Bookings
-                    </Link>
-
-                    <Link
-                      to="/settings"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
-                        hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                      <Settings className="mr-3 h-4 w-4" />
-                      Settings
-                    </Link>
-
                     <button
-                      onClick={handleLogout}
+                      onClick={() => {
+                        setShowDropdown(false);
+                        handleLogout();
+                      }}
                       className="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 
-                        hover:bg-gray-100 dark:hover:bg-gray-700"
+                        hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                     >
                       <LogOut className="mr-3 h-4 w-4" />
-                      Logout
+                      Sign out
                     </button>
                   </motion.div>
                 )}
               </div>
             ) : (
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center gap-4">
                 <button
-                  onClick={() => onOpenLoginModal()}
+                  onClick={onOpenLoginModal}
                   className="text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 
-                    px-3 py-2 text-sm font-medium"
+                    px-3 py-2 text-sm font-medium transition-colors"
                 >
-                  Login
+                  Log in
                 </button>
                 <button
-                  onClick={() => onOpenSignUpModal()}
-                  className="bg-purple-600 text-white hover:bg-purple-700 px-4 py-2 rounded-lg text-sm font-medium"
+                  onClick={onOpenSignUpModal}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium 
+                    hover:bg-purple-700 transition-colors"
                 >
-                  Sign Up
+                  Sign up
                 </button>
               </div>
             )}

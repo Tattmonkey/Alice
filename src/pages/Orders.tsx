@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Package, Truck, Clock, AlertTriangle } from 'lucide-react';
+import { Package, Clock, Calendar, DollarSign, ChevronRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { getUserOrders } from '../services/firebase/orders';
+import { Order } from '../types';
+import LoadingScreen from '../components/LoadingScreen';
 
 interface Order {
   id: string;

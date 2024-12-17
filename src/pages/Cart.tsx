@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingBag, Trash2, Plus, Minus, ArrowRight } from 'lucide-react';
+import { ShoppingCart, Trash2, Plus, Minus, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useCart } from '../contexts/CartContext';
 import toast from 'react-hot-toast';
 
 export default function Cart() {
@@ -15,7 +16,7 @@ export default function Cart() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white dark:from-purple-900/20 dark:to-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <ShoppingBag className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <ShoppingCart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-2 dark:text-white">Please sign in to view your cart</h2>
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -86,7 +87,7 @@ export default function Cart() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white dark:from-purple-900/20 dark:to-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <ShoppingBag className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <ShoppingCart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-2 dark:text-white">Your cart is empty</h2>
           <p className="text-gray-600 dark:text-gray-400 mb-6">Add some items to get started!</p>
           <motion.button
@@ -112,7 +113,7 @@ export default function Cart() {
           className="text-center mb-12"
         >
           <div className="flex items-center justify-center gap-2 mb-4">
-            <ShoppingBag className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+            <ShoppingCart className="w-8 h-8 text-purple-600 dark:text-purple-400" />
             <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-purple-400 dark:to-indigo-400">
               Shopping Cart
             </h1>

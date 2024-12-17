@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { MessagingProvider } from './contexts/MessagingContext';
-import { GalleryProvider } from './contexts/GalleryContext';
-import { BookingProvider } from './contexts/BookingContext';
-import { User } from './contexts/AuthContext';
+import { Toaster } from 'react-hot-toast';
+import ErrorBoundary from './components/ErrorBoundary';
+import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import LoginModal from './components/auth/LoginModal';
 import SignUpModal from './components/auth/SignUpModal';
 import ResetPasswordModal from './components/auth/ResetPasswordModal';
+
+// Pages
 import Home from './pages/Home';
 import Artists from './pages/Artists';
 import Shop from './pages/Shop';
@@ -21,13 +21,20 @@ import Orders from './pages/Orders';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import RefundPolicy from './pages/RefundPolicy';
+import AdminLogin from './pages/AdminLogin';
+
+// User Components
 import UserDashboard from './components/UserDashboard';
 import UserSettings from './components/UserSettings';
 import UserMessages from './components/user/UserMessages';
 import UserGallery from './components/user/UserGallery';
 import UserBookings from './components/user/UserBookings';
+
+// Artist Components
 import ArtistDashboard from './components/artists/ArtistDashboard';
 import ArtistSettings from './components/artists/ArtistSettings';
+
+// Admin Components
 import AdminDashboard from './components/admin/AdminDashboard';
 import UserManager from './components/admin/UserManager';
 import ProductManager from './components/admin/ProductManager';
@@ -37,228 +44,172 @@ import NotificationCenter from './components/admin/NotificationCenter';
 import PaymentSettings from './components/admin/PaymentSettings';
 import ShippingManager from './components/admin/shipping/ShippingManager';
 import APISettings from './components/admin/APISettings';
-import ProtectedRoute from './components/ProtectedRoute';
-import AdminLogin from './pages/AdminLogin';
-
-interface AdminRouteProps {
-  children: React.ReactNode;
-}
-
-const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => (
-  <ProtectedRoute>
-    {({ user }: { user: User }) => {
-      if (user?.role?.type !== 'admin') {
-        return (
-          <div className="text-red-500 p-4">
-            Must be an admin to access this page
-          </div>
-        );
-      }
-      return <>{children}</>;
-    }}
-  </ProtectedRoute>
-);
 
 export default function App() {
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [isSignUpModalOpen, setIsSignUpModalOpen] = useState(false);
-  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
-
-  const handleSwitchToSignUp = () => {
-    setIsLoginModalOpen(false);
-    setIsSignUpModalOpen(true);
-  };
-
-  const handleSwitchToLogin = () => {
-    setIsSignUpModalOpen(false);
-    setIsLoginModalOpen(true);
-  };
-
-  const handleResetPassword = () => {
-    setIsLoginModalOpen(false);
-    setIsResetPasswordModalOpen(true);
-  };
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
 
   return (
-    <AuthProvider>
-      <GalleryProvider>
-        <BookingProvider>
-          <MessagingProvider>
-            <div className="min-h-screen bg-purple-50 dark:bg-[#0f0616] transition-colors flex flex-col">
-              <Navbar 
-                onOpenLoginModal={() => setIsLoginModalOpen(true)}
-                onOpenSignUpModal={() => setIsSignUpModalOpen(true)}
-              />
-              
-              <main className="flex-1">
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/artists" element={<Artists />} />
-                  <Route path="/shop" element={<Shop />} />
-                  <Route path="/shop/product/:id" element={<ProductDetail />} />
-                  <Route path="/blog" element={<Blog />} />
-                  <Route path="/cart" element={<Cart />} />
-                  <Route path="/checkout" element={
-                    <ProtectedRoute>
-                      <Checkout />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/orders" element={
-                    <ProtectedRoute>
-                      <Orders />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/settings" element={
-                    <ProtectedRoute>
-                      <UserSettings />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/messages" element={
-                    <ProtectedRoute>
-                      <UserMessages />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/gallery" element={
-                    <ProtectedRoute>
-                      <UserGallery />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/bookings" element={
-                    <ProtectedRoute>
-                      <UserBookings />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/privacy" element={<PrivacyPolicy />} />
-                  <Route path="/terms" element={<TermsOfService />} />
-                  <Route path="/refunds" element={<RefundPolicy />} />
-                  <Route path="/admin" element={<AdminLogin />} />
-                  <Route
-                    path="/dashboard"
-                    element={
-                      <ProtectedRoute>
-                        <UserDashboard />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/artist/dashboard"
-                    element={
-                      <ProtectedRoute>
-                        <ArtistDashboard />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/artist/settings"
-                    element={
-                      <ProtectedRoute>
-                        <ArtistSettings />
-                      </ProtectedRoute>
-                    }
-                  />
-                  
-                  {/* Admin Routes */}
-                  <Route
-                    path="/admin/dashboard"
-                    element={
-                      <AdminRoute>
-                        <AdminDashboard />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/users"
-                    element={
-                      <AdminRoute>
-                        <UserManager />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/products"
-                    element={
-                      <AdminRoute>
-                        <ProductManager />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/blog"
-                    element={
-                      <AdminRoute>
-                        <BlogManager />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/analytics"
-                    element={
-                      <AdminRoute>
-                        <AnalyticsDashboard />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/notifications"
-                    element={
-                      <AdminRoute>
-                        <NotificationCenter />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/payments"
-                    element={
-                      <AdminRoute>
-                        <PaymentSettings />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/shipping"
-                    element={
-                      <AdminRoute>
-                        <ShippingManager />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/api"
-                    element={
-                      <AdminRoute>
-                        <APISettings />
-                      </AdminRoute>
-                    }
-                  />
-                </Routes>
-              </main>
+    <ErrorBoundary>
+      <div className="flex flex-col min-h-screen bg-gradient-to-b from-purple-50 to-white dark:from-[#0f0616] dark:to-[#150a24]">
+        <Navbar 
+          onOpenLoginModal={() => setShowLoginModal(true)}
+          onOpenSignUpModal={() => setShowSignUpModal(true)}
+        />
+        
+        <main className="flex-grow">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/artists" element={<Artists />} />
+            <Route path="/shop" element={<Shop />} />
+            <Route path="/shop/:productId" element={<ProductDetail />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/cart" element={<Cart />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
 
-              <Footer />
-            </div>
+            {/* Protected Routes */}
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <UserDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/dashboard/settings" element={
+              <ProtectedRoute>
+                <UserSettings />
+              </ProtectedRoute>
+            } />
+            <Route path="/dashboard/messages" element={
+              <ProtectedRoute>
+                <UserMessages />
+              </ProtectedRoute>
+            } />
+            <Route path="/dashboard/gallery" element={
+              <ProtectedRoute>
+                <UserGallery />
+              </ProtectedRoute>
+            } />
+            <Route path="/dashboard/bookings" element={
+              <ProtectedRoute>
+                <UserBookings />
+              </ProtectedRoute>
+            } />
 
-            <LoginModal 
-              isOpen={isLoginModalOpen}
-              onClose={() => setIsLoginModalOpen(false)}
-              onSwitchToSignUp={handleSwitchToSignUp}
-              onResetPassword={handleResetPassword}
-            />
-            <SignUpModal
-              isOpen={isSignUpModalOpen}
-              onClose={() => setIsSignUpModalOpen(false)}
-              onSwitchToLogin={handleSwitchToLogin}
-            />
-            <ResetPasswordModal
-              isOpen={isResetPasswordModalOpen}
-              onClose={() => setIsResetPasswordModalOpen(false)}
-              onSwitchToLogin={() => {
-                setIsResetPasswordModalOpen(false);
-                setIsLoginModalOpen(true);
-              }}
-            />
+            {/* Artist Routes */}
+            <Route path="/artist/dashboard" element={
+              <ProtectedRoute allowedRoles={['artist']}>
+                <ArtistDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/artist/settings" element={
+              <ProtectedRoute allowedRoles={['artist']}>
+                <ArtistSettings />
+              </ProtectedRoute>
+            } />
 
-          </MessagingProvider>
-        </BookingProvider>
-      </GalleryProvider>
-    </AuthProvider>
+            {/* Admin Routes */}
+            <Route path="/admin/dashboard" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/users" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <UserManager />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/products" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <ProductManager />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/blog" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <BlogManager />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/analytics" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AnalyticsDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/notifications" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <NotificationCenter />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/payments" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <PaymentSettings />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/shipping" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <ShippingManager />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/api" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <APISettings />
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </main>
+
+        <Footer />
+
+        {showLoginModal && (
+          <LoginModal
+            onClose={() => setShowLoginModal(false)}
+            onSignUpClick={() => {
+              setShowLoginModal(false);
+              setShowSignUpModal(true);
+            }}
+            onForgotPasswordClick={() => {
+              setShowLoginModal(false);
+              setShowResetPasswordModal(true);
+            }}
+          />
+        )}
+
+        {showSignUpModal && (
+          <SignUpModal
+            onClose={() => setShowSignUpModal(false)}
+            onLoginClick={() => {
+              setShowSignUpModal(false);
+              setShowLoginModal(true);
+            }}
+          />
+        )}
+
+        {showResetPasswordModal && (
+          <ResetPasswordModal
+            onClose={() => setShowResetPasswordModal(false)}
+            onBackToLogin={() => {
+              setShowResetPasswordModal(false);
+              setShowLoginModal(true);
+            }}
+          />
+        )}
+        <Toaster 
+          position="bottom-right"
+          toastOptions={{
+            duration: 5000,
+            error: {
+              duration: 10000,
+              style: {
+                background: '#FEE2E2',
+                color: '#991B1B',
+              }
+            }
+          }} 
+        />
+      </div>
+    </ErrorBoundary>
   );
 }

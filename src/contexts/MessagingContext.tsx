@@ -15,7 +15,7 @@ import {
   increment
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { useAuth } from './AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Message, MessageThread, ThreadParticipant, MessageStatus, MessageAttachment } from '../types/messages';
 import { uploadMultipleAttachments, deleteMessageAttachment } from '../utils/storage';
 import toast from 'react-hot-toast';

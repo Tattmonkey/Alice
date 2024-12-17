@@ -1,10 +1,12 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ShoppingBag, Star, Heart, Share2, ArrowLeft, Tag } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
+import { ShoppingCart, Heart, Share2, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { getProductById } from '../services/firebase/products';
 import { Product } from '../types';
+import { useCart } from '../contexts/CartContext';
+import toast from 'react-hot-toast';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -159,7 +161,7 @@ export default function ProductDetail() {
                 onClick={addToCart}
                 className="flex-1 py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
               >
-                <ShoppingBag className="w-5 h-5" />
+                <ShoppingCart className="w-5 h-5" />
                 Add to Cart
               </motion.button>
 

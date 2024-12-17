@@ -1,3 +1,9 @@
+export enum UserRole {
+  USER = 'user',
+  ARTIST = 'artist',
+  ADMIN = 'admin'
+}
+
 export interface User {
   id: string;
   name: string;
@@ -47,13 +53,6 @@ export interface Booking {
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   notes?: string;
   price: number;
-}
-
-export interface UserRole {
-  type: 'admin' | 'artist' | 'user';
-  verified?: boolean;
-  createdAt: string;
-  permissions?: string[];
 }
 
 export interface ArtistProfile extends User {

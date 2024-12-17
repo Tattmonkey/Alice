@@ -2,17 +2,12 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Type, RotateCcw, Loader2, ChevronDown, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { User } from '../types';
 import { FONT_STYLES, FontStyle } from '../utils/fonts';
 import { generateTextDesign } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 
-interface Props {
-  user: User;
-}
-
-export default function TextGenerator({ user }: Props) {
-  const { updateUserCredits } = useAuth();
+export default function TextGenerator() {
+  const { user, updateUserCredits } = useAuth();
   const [text, setText] = useState('');
   const [isAmbigram, setIsAmbigram] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<FontStyle>(FONT_STYLES[0]);
@@ -23,6 +18,11 @@ export default function TextGenerator({ user }: Props) {
   const handleGenerate = async () => {
     if (!text) {
       toast.error('Please enter some text');
+      return;
+    }
+
+    if (!user) {
+      toast.error('Please sign in to generate designs');
       return;
     }
 
@@ -173,7 +173,7 @@ export default function TextGenerator({ user }: Props) {
             </div>
             <motion.button
               onClick={handleGenerate}
-              disabled={loading || !text}
+              disabled={loading || !text || !user}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-medium transition-all duration-300 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-purple-200"

@@ -18,6 +18,16 @@ import { useBooking } from '../../contexts/BookingContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArtistService, DaySchedule, TimeSlot } from '../../types/booking';
 import LoadingScreen from '../LoadingScreen';
+import toast from 'react-hot-toast';
+
+enum BookingStep {
+  SERVICE = 'service',
+  DATE = 'date',
+  TIME = 'time',
+  DETAILS = 'details',
+  PAYMENT = 'payment',
+  CONFIRMATION = 'confirmation'
+}
 
 interface BookingModalProps {
   artistId: string;
@@ -25,457 +35,336 @@ interface BookingModalProps {
   onClose: () => void;
 }
 
-type BookingStep = 'service' | 'datetime' | 'consultation' | 'attachments' | 'payment' | 'confirmation';
-
 export default function BookingModal({ artistId, isOpen, onClose }: BookingModalProps) {
   const { user } = useAuth();
-  const { 
-    artistServices, 
-    getArtistAvailability,
-    createBooking,
-    loading 
-  } = useBooking();
-
-  const [currentStep, setCurrentStep] = useState<BookingStep>('service');
+  const { createBooking, checkTimeSlotAvailability } = useBooking();
+  const [currentStep, setCurrentStep] = useState<BookingStep>(BookingStep.SERVICE);
   const [selectedService, setSelectedService] = useState<ArtistService | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [schedule, setSchedule] = useState<DaySchedule[]>([]);
-  const [consultationNotes, setConsultationNotes] = useState('');
-  const [attachments, setAttachments] = useState<File[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [bookingDetails, setBookingDetails] = useState({
+    notes: '',
+    references: [] as File[]
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const modalRef = useRef<HTMLDivElement>(null);
 
-  // Fetch availability when month changes
   useEffect(() => {
-    if (!artistId) return;
-
-    const fetchAvailability = async () => {
-      try {
-        const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-        const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-        const availability = await getArtistAvailability(artistId, start, end);
-        setSchedule(availability);
-      } catch (err) {
-        console.error('Error fetching availability:', err);
-      }
-    };
-
-    fetchAvailability();
-  }, [artistId, currentMonth]);
-
-  if (!user) return null;
-  if (loading) return <LoadingScreen />;
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setAttachments(prev => [...prev, ...files]);
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleNextStep = () => {
-    switch (currentStep) {
-      case 'service':
-        setCurrentStep('datetime');
-        break;
-      case 'datetime':
-        if (selectedService?.requiresConsultation) {
-          setCurrentStep('consultation');
-        } else {
-          setCurrentStep('attachments');
-        }
-        break;
-      case 'consultation':
-        setCurrentStep('attachments');
-        break;
-      case 'attachments':
-        setCurrentStep('payment');
-        break;
-      case 'payment':
-        handleBookingSubmit();
-        break;
+    if (!isOpen) {
+      resetForm();
     }
-  };
+  }, [isOpen]);
 
-  const handlePreviousStep = () => {
-    switch (currentStep) {
-      case 'datetime':
-        setCurrentStep('service');
-        break;
-      case 'consultation':
-        setCurrentStep('datetime');
-        break;
-      case 'attachments':
-        if (selectedService?.requiresConsultation) {
-          setCurrentStep('consultation');
-        } else {
-          setCurrentStep('datetime');
-        }
-        break;
-      case 'payment':
-        setCurrentStep('attachments');
-        break;
+  useEffect(() => {
+    if (selectedDate) {
+      fetchAvailableTimeSlots();
     }
+  }, [selectedDate]);
+
+  const resetForm = () => {
+    setCurrentStep(BookingStep.SERVICE);
+    setSelectedService(null);
+    setSelectedDate(null);
+    setSelectedTime(null);
+    setBookingDetails({ notes: '', references: [] });
+    setError(null);
   };
 
-  const handleBookingSubmit = async () => {
-    if (!selectedService || !selectedDate || !selectedSlot) return;
-
-    setIsProcessing(true);
+  const fetchAvailableTimeSlots = async () => {
     try {
-      const bookingId = await createBooking({
+      setLoading(true);
+      // Here you would fetch available time slots from your backend
+      // For now, let's use dummy data
+      const slots = [
+        '09:00', '10:00', '11:00', '13:00', '14:00', '15:00'
+      ];
+      setAvailableTimeSlots(slots);
+    } catch (error) {
+      console.error('Error fetching time slots:', error);
+      setError('Failed to load available time slots');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleServiceSelect = (service: ArtistService) => {
+    setSelectedService(service);
+    setCurrentStep(BookingStep.DATE);
+  };
+
+  const handleDateSelect = (date: Date) => {
+    setSelectedDate(date);
+    setCurrentStep(BookingStep.TIME);
+  };
+
+  const handleTimeSelect = (time: string) => {
+    setSelectedTime(time);
+    setCurrentStep(BookingStep.DETAILS);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    setBookingDetails(prev => ({
+      ...prev,
+      references: [...prev.references, ...files]
+    }));
+  };
+
+  const handleSubmit = async () => {
+    if (!user || !selectedService || !selectedDate || !selectedTime) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Check if time slot is still available
+      const timeSlot: TimeSlot = {
+        date: format(selectedDate, 'yyyy-MM-dd'),
+        time: selectedTime
+      };
+
+      const isAvailable = await checkTimeSlotAvailability(artistId, timeSlot);
+      if (!isAvailable) {
+        setError('This time slot is no longer available. Please select another time.');
+        setCurrentStep(BookingStep.TIME);
+        return;
+      }
+
+      // Create booking
+      await createBooking({
         artistId,
         userId: user.id,
-        serviceId: selectedService.id,
-        status: selectedService.requiresConsultation ? 'pending' : 'confirmed',
-        date: selectedDate,
-        startTime: selectedSlot.startTime,
-        endTime: selectedSlot.endTime,
-        duration: selectedService.duration,
-        price: selectedService.price,
-        deposit: selectedService.deposit,
-        depositPaid: false,
-        consultation: selectedService.requiresConsultation ? {
-          required: true,
-          completed: false,
-          notes: consultationNotes
-        } : undefined
+        service: selectedService,
+        timeSlot,
+        notes: bookingDetails.notes,
+        references: bookingDetails.references
       });
 
-      // Upload attachments if any
-      if (attachments.length > 0) {
-        // TODO: Implement attachment upload
-      }
-
-      setCurrentStep('confirmation');
-    } catch (err) {
-      console.error('Error creating booking:', err);
+      toast.success('Booking created successfully!');
+      onClose();
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      setError('Failed to create booking. Please try again.');
     } finally {
-      setIsProcessing(false);
+      setLoading(false);
     }
   };
 
-  const renderServiceSelection = () => (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-        Select a Service
-      </h3>
-      <div className="grid gap-4">
-        {artistServices.map(service => (
-          <button
-            key={service.id}
-            onClick={() => setSelectedService(service)}
-            className={`p-4 rounded-lg border ${
-              selectedService?.id === service.id
-                ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
-            }`}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <h4 className="font-medium text-gray-900 dark:text-white">
-                  {service.name}
-                </h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {service.description}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="font-medium text-gray-900 dark:text-white">
-                  ${service.price}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {service.duration} min
-                </p>
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+  const handleBack = () => {
+    switch (currentStep) {
+      case BookingStep.DATE:
+        setCurrentStep(BookingStep.SERVICE);
+        break;
+      case BookingStep.TIME:
+        setCurrentStep(BookingStep.DATE);
+        break;
+      case BookingStep.DETAILS:
+        setCurrentStep(BookingStep.TIME);
+        break;
+      case BookingStep.PAYMENT:
+        setCurrentStep(BookingStep.DETAILS);
+        break;
+      default:
+        break;
+    }
+  };
 
-  const renderDateTimeSelection = () => (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-        Select Date & Time
-      </h3>
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => setCurrentMonth(prev => addMonths(prev, -1))}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <h4 className="font-medium">
-              {format(currentMonth, 'MMMM yyyy')}
-            </h4>
-            <button
-              onClick={() => setCurrentMonth(prev => addMonths(prev, 1))}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-              <div
-                key={day}
-                className="text-center text-sm font-medium text-gray-500 dark:text-gray-400"
-              >
-                {day}
-              </div>
-            ))}
-            {schedule.map((day, index) => (
-              <button
-                key={day.date}
-                onClick={() => day.isAvailable && setSelectedDate(day.date)}
-                disabled={!day.isAvailable}
-                className={`aspect-square rounded-lg flex items-center justify-center ${
-                  selectedDate === day.date
-                    ? 'bg-purple-500 text-white'
-                    : day.isAvailable
-                    ? 'hover:bg-gray-100 dark:hover:bg-gray-800'
-                    : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
-                }`}
-              >
-                {format(new Date(day.date), 'd')}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex-1">
-          <h4 className="font-medium mb-4">Available Times</h4>
-          <div className="space-y-2">
-            {selectedDate && schedule.find(d => d.date === selectedDate)?.slots.map(slot => (
-              <button
-                key={`${slot.startTime}-${slot.endTime}`}
-                onClick={() => setSelectedSlot(slot)}
-                disabled={!slot.available}
-                className={`w-full p-2 rounded-lg ${
-                  selectedSlot === slot
-                    ? 'bg-purple-500 text-white'
-                    : slot.available
-                    ? 'hover:bg-gray-100 dark:hover:bg-gray-800'
-                    : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
-                }`}
-              >
-                {slot.startTime} - {slot.endTime}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderConsultation = () => (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-        Consultation Details
-      </h3>
-      <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-yellow-500 mt-0.5" />
-          <div>
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
-              This service requires a consultation before booking.
-              Please provide any relevant details or questions below.
-            </p>
-          </div>
-        </div>
-      </div>
-      <textarea
-        value={consultationNotes}
-        onChange={e => setConsultationNotes(e.target.value)}
-        placeholder="Describe your tattoo idea, reference images, placement, size, etc..."
-        rows={6}
-        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-      />
-    </div>
-  );
-
-  const renderAttachments = () => (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-        Add References
-      </h3>
-      <div className="space-y-4">
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center gap-2 hover:border-purple-500 dark:hover:border-purple-400"
-        >
-          <Upload className="w-6 h-6 text-gray-400" />
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            Click to upload images or documents
-          </span>
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-        {attachments.length > 0 && (
-          <div className="grid grid-cols-2 gap-4">
-            {attachments.map((file, index) => (
-              <div
-                key={index}
-                className="relative group bg-gray-100 dark:bg-gray-800 rounded p-2"
-              >
-                <div className="flex items-center gap-2">
-                  {file.type.startsWith('image/') ? (
-                    <ImageIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                  ) : (
-                    <FileText className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                  )}
-                  <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
-                    {file.name}
-                  </span>
-                </div>
-                <button
-                  onClick={() => removeAttachment(index)}
-                  className="absolute top-1/2 right-2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X className="w-4 h-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  const renderPayment = () => (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-        Payment Details
-      </h3>
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 space-y-4">
-        <div className="flex justify-between items-center">
-          <span className="text-gray-600 dark:text-gray-300">Service</span>
-          <span className="font-medium text-gray-900 dark:text-white">
-            {selectedService?.name}
-          </span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-gray-600 dark:text-gray-300">Date</span>
-          <span className="font-medium text-gray-900 dark:text-white">
-            {selectedDate && format(new Date(selectedDate), 'MMMM d, yyyy')}
-          </span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-gray-600 dark:text-gray-300">Time</span>
-          <span className="font-medium text-gray-900 dark:text-white">
-            {selectedSlot?.startTime} - {selectedSlot?.endTime}
-          </span>
-        </div>
-        <div className="border-t dark:border-gray-700 pt-4">
-          <div className="flex justify-between items-center">
-            <span className="text-gray-600 dark:text-gray-300">Deposit Required</span>
-            <span className="font-medium text-gray-900 dark:text-white">
-              ${selectedService?.deposit}
-            </span>
-          </div>
-        </div>
-      </div>
-      <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-        <p className="text-sm text-purple-800 dark:text-purple-200">
-          A deposit of ${selectedService?.deposit} is required to secure your booking.
-          The remaining balance of ${(selectedService?.price || 0) - (selectedService?.deposit || 0)} will be due at the appointment.
-        </p>
-      </div>
-      {/* TODO: Implement payment form */}
-    </div>
-  );
-
-  const renderConfirmation = () => (
-    <div className="text-center space-y-4">
-      <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto">
-        <Check className="w-8 h-8 text-green-500" />
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-        Booking Confirmed
-      </h3>
-      <p className="text-gray-600 dark:text-gray-300">
-        {selectedService?.requiresConsultation
-          ? 'Your consultation request has been sent. The artist will review your request and contact you soon.'
-          : 'Your appointment has been booked successfully. You will receive a confirmation email shortly.'}
-      </p>
-      <button
-        onClick={onClose}
-        className="mt-6 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-      >
-        Done
-      </button>
-    </div>
-  );
+  if (!isOpen) return null;
 
   return (
     <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-        >
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex min-h-screen items-center justify-center px-4">
           <motion.div
-            initial={{ scale: 0.95 }}
-            animate={{ scale: 1 }}
-            exit={{ scale: 0.95 }}
-            className="relative max-w-2xl w-full bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50"
+            onClick={onClose}
+          />
+
+          <motion.div
+            ref={modalRef}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="relative w-full max-w-2xl rounded-2xl bg-white p-8 shadow-xl"
           >
+            {/* Close button */}
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              className="absolute right-4 top-4 p-2 text-gray-400 hover:text-gray-600"
             >
-              <X className="w-5 h-5" />
+              <X className="h-6 w-6" />
             </button>
 
-            <div className="p-6">
-              {currentStep === 'service' && renderServiceSelection()}
-              {currentStep === 'datetime' && renderDateTimeSelection()}
-              {currentStep === 'consultation' && renderConsultation()}
-              {currentStep === 'attachments' && renderAttachments()}
-              {currentStep === 'payment' && renderPayment()}
-              {currentStep === 'confirmation' && renderConfirmation()}
+            {/* Modal content */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold">Book Appointment</h2>
+              <p className="mt-2 text-gray-600">
+                {currentStep === BookingStep.SERVICE && 'Select a service'}
+                {currentStep === BookingStep.DATE && 'Choose a date'}
+                {currentStep === BookingStep.TIME && 'Pick a time'}
+                {currentStep === BookingStep.DETAILS && 'Add booking details'}
+                {currentStep === BookingStep.PAYMENT && 'Complete payment'}
+              </p>
             </div>
 
-            {currentStep !== 'confirmation' && (
-              <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 flex justify-between">
-                <button
-                  onClick={handlePreviousStep}
-                  disabled={currentStep === 'service'}
-                  className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={handleNextStep}
-                  disabled={
-                    !selectedService ||
-                    (currentStep === 'datetime' && (!selectedDate || !selectedSlot)) ||
-                    (currentStep === 'consultation' && !consultationNotes.trim()) ||
-                    isProcessing
-                  }
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {currentStep === 'payment' ? 'Confirm & Pay' : 'Continue'}
-                </button>
-              </div>
+            {loading ? (
+              <LoadingScreen />
+            ) : (
+              <>
+                {error && (
+                  <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-600">
+                    <div className="flex items-center">
+                      <AlertCircle className="mr-2 h-5 w-5" />
+                      {error}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-6">
+                  {/* Step content */}
+                  {currentStep === BookingStep.SERVICE && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {/* Add your service options here */}
+                    </div>
+                  )}
+
+                  {currentStep === BookingStep.DATE && (
+                    <div>
+                      {/* Add your date picker here */}
+                    </div>
+                  )}
+
+                  {currentStep === BookingStep.TIME && (
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      {availableTimeSlots.map(time => (
+                        <button
+                          key={time}
+                          onClick={() => handleTimeSelect(time)}
+                          className={`flex items-center justify-center rounded-lg border p-4 ${
+                            selectedTime === time
+                              ? 'border-purple-600 bg-purple-50 text-purple-600'
+                              : 'border-gray-200 hover:border-purple-600 hover:bg-purple-50'
+                          }`}
+                        >
+                          <Clock className="mr-2 h-5 w-5" />
+                          {time}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {currentStep === BookingStep.DETAILS && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Notes
+                        </label>
+                        <textarea
+                          value={bookingDetails.notes}
+                          onChange={e => setBookingDetails(prev => ({ ...prev, notes: e.target.value }))}
+                          className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          rows={4}
+                          placeholder="Add any special requests or notes..."
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Reference Images
+                        </label>
+                        <div className="mt-1 flex items-center space-x-4">
+                          <label className="flex cursor-pointer items-center rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50">
+                            <Upload className="mr-2 h-5 w-5 text-gray-400" />
+                            <span>Upload</span>
+                            <input
+                              type="file"
+                              className="hidden"
+                              multiple
+                              accept="image/*"
+                              onChange={handleFileUpload}
+                            />
+                          </label>
+                          <span className="text-sm text-gray-500">
+                            {bookingDetails.references.length} files selected
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Navigation buttons */}
+                <div className="mt-8 flex justify-between">
+                  {currentStep !== BookingStep.SERVICE && (
+                    <button
+                      onClick={handleBack}
+                      className="flex items-center rounded-lg border border-gray-300 px-6 py-2 text-gray-700 hover:bg-gray-50"
+                    >
+                      <ChevronLeft className="mr-2 h-5 w-5" />
+                      Back
+                    </button>
+                  )}
+
+                  {currentStep === BookingStep.DETAILS ? (
+                    <button
+                      onClick={handleSubmit}
+                      disabled={loading}
+                      className="ml-auto flex items-center rounded-lg bg-purple-600 px-6 py-2 text-white hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      {loading ? (
+                        <>
+                          <Upload className="mr-2 h-5 w-5 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="mr-2 h-5 w-5" />
+                          Complete Booking
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        switch (currentStep) {
+                          case BookingStep.SERVICE:
+                            if (selectedService) setCurrentStep(BookingStep.DATE);
+                            break;
+                          case BookingStep.DATE:
+                            if (selectedDate) setCurrentStep(BookingStep.TIME);
+                            break;
+                          case BookingStep.TIME:
+                            if (selectedTime) setCurrentStep(BookingStep.DETAILS);
+                            break;
+                          default:
+                            break;
+                        }
+                      }}
+                      disabled={
+                        (currentStep === BookingStep.SERVICE && !selectedService) ||
+                        (currentStep === BookingStep.DATE && !selectedDate) ||
+                        (currentStep === BookingStep.TIME && !selectedTime)
+                      }
+                      className="ml-auto flex items-center rounded-lg bg-purple-600 px-6 py-2 text-white hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      Next
+                      <ChevronRight className="ml-2 h-5 w-5" />
+                    </button>
+                  )}
+                </div>
+              </>
             )}
           </motion.div>
-        </motion.div>
-      )}
+        </div>
+      </div>
     </AnimatePresence>
   );
 }

@@ -1,5 +1,10 @@
-import React, { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Image, Plus, Upload, X, Loader2 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useGallery } from '../../contexts/GalleryContext';
+import toast from 'react-hot-toast';
+
 import { 
   Upload,
   Filter,
@@ -12,8 +17,6 @@ import {
   Image as ImageIcon,
   Tag
 } from 'lucide-react';
-import { useGallery } from '../../contexts/GalleryContext';
-import { useAuth } from '../../contexts/AuthContext';
 import { GalleryItem, GalleryFilter } from '../../types/gallery';
 import LoadingScreen from '../LoadingScreen';
 

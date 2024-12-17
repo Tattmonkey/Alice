@@ -28,7 +28,7 @@ import { BookingStats } from '../../types/booking';
 import LoadingScreen from '../LoadingScreen';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 
-const COLORS = ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+const COLORS = ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#ef4444']
 
 interface MonthlyData {
   month: string;

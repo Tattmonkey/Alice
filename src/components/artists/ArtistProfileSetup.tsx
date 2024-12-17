@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { Upload, MapPin, DollarSign, Camera, Save, Loader2, Link as LinkIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
+import UserAvatar from '../UserAvatar';
 
 const schema = z.object({
   bio: z.string().min(50, 'Bio must be at least 50 characters'),
@@ -45,8 +46,6 @@ interface Props {
 
 export default function ArtistProfileSetup({ onComplete }: Props) {
   const [loading, setLoading] = useState(false);
-  const [avatar, setAvatar] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState('');
   const [portfolioImages, setPortfolioImages] = useState<File[]>([]);
   const [portfolioPreviews, setPortfolioPreviews] = useState<string[]>([]);
 
@@ -65,18 +64,6 @@ export default function ArtistProfileSetup({ onComplete }: Props) {
       }
     }
   });
-
-  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setAvatar(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   const handlePortfolioChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -119,33 +106,11 @@ export default function ArtistProfileSetup({ onComplete }: Props) {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
               Profile Picture
             </label>
-            <div className="flex items-center gap-6">
-              <div className="relative">
-                {avatarPreview ? (
-                  <img
-                    src={avatarPreview}
-                    alt="Profile preview"
-                    className="w-24 h-24 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                    <Camera className="w-8 h-8 text-gray-400" />
-                  </div>
-                )}
-                <label className="absolute bottom-0 right-0 p-2 bg-purple-600 text-white rounded-full cursor-pointer hover:bg-purple-700 transition-colors">
-                  <Upload className="w-4 h-4" />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleAvatarChange}
-                  />
-                </label>
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                <p>Upload a professional profile picture</p>
-                <p>Recommended size: 500x500px</p>
-              </div>
+            <div className="flex flex-col items-center gap-4">
+              <UserAvatar size="lg" showUpload={true} />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Click the upload icon to change your profile picture
+              </p>
             </div>
           </div>
 

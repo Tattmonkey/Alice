@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useAuth } from '../../contexts/AuthContext';
 import { Users, Star, DollarSign, Calendar, TrendingUp, BarChart } from 'lucide-react';
 import { User } from '../../types';
 

@@ -1,219 +1,260 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
-  User as FirebaseUser,
-  sendPasswordResetEmail,
-  AuthError
-} from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, googleProvider } from '../config/firebase';
-import { showSuccessToast, showErrorToast } from '../utils/toast';
-import { getCurrentUser, checkUserRole } from '../utils/auth';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase/init';
+import { User } from '../types';
+import toast from 'react-hot-toast';
 
-interface User {
-  id: string;
-  uid: string;
-  displayName: string | null;
-  email: string | null;
-  photoURL: string | null;
-  name?: string;
-  role?: { type: string; verified: boolean; createdAt: string };
-  createdAt?: string;
-  updatedAt?: string;
-}
+const ADMIN_EMAILS = ['washington@alicetattoos.com', 'support@alicetattoos.com'];
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  error: string | null;
+  isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
+  updateUserCredits: (userId: string, amount: number) => Promise<void>;
+  updateProfile: (data: { name: string; email: string }) => Promise<void>;
+  deleteAccount: () => Promise<void>;
+  revertToUser: () => Promise<void>;
+  switchToArtist: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => {
+async function handleUserData(firebaseUser: FirebaseUser): Promise<{ user: User; isAdmin: boolean }> {
+  const userRef = doc(db, 'users', firebaseUser.uid);
+  const userDoc = await getDoc(userRef);
+  const isAdminUser = ADMIN_EMAILS.includes(firebaseUser.email || '');
+
+  if (userDoc.exists()) {
+    const userData = userDoc.data();
+    return {
+      user: { id: firebaseUser.uid, ...userData } as User,
+      isAdmin: isAdminUser
+    };
+  }
+
+  // Create new user document
+  const newUser: User = {
+    id: firebaseUser.uid,
+    email: firebaseUser.email || '',
+    name: firebaseUser.displayName || 'User',
+    credits: 0,
+    cart: [],
+    creations: [],
+    bookings: [],
+    role: {
+      type: isAdminUser ? 'admin' : 'user',
+      verified: isAdminUser,
+      createdAt: new Date().toISOString()
+    }
+  };
+
+  await setDoc(userRef, newUser);
+  return { user: newUser, isAdmin: isAdminUser };
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [authInitialized, setAuthInitialized] = useState(false);
+
+  useEffect(() => {
+    console.log('[Auth] Setting up auth state observer...');
+    
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      try {
+        if (firebaseUser) {
+          const { user: userData, isAdmin: isAdminUser } = await handleUserData(firebaseUser);
+          setUser(userData);
+          setIsAdmin(isAdminUser);
+          console.log('[Auth] User authenticated:', { uid: userData.id, isAdmin: isAdminUser });
+        } else {
+          setUser(null);
+          setIsAdmin(false);
+          console.log('[Auth] No authenticated user');
+        }
+      } catch (error) {
+        console.error('[Auth] State observer error:', error);
+        setUser(null);
+        setIsAdmin(false);
+        toast.error('Authentication error occurred');
+      } finally {
+        setLoading(false);
+        setAuthInitialized(true);
+      }
+    });
+
+    return () => {
+      console.log('[Auth] Cleaning up auth state observer');
+      unsubscribe();
+    };
+  }, []);
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      toast.success('Successfully signed in!');
+    } catch (error: any) {
+      console.error('[Auth] Sign in error:', error);
+      if (error.code === 'auth/invalid-credential') {
+        toast.error('Invalid email or password');
+      } else {
+        toast.error('Failed to sign in');
+      }
+      throw error;
+    }
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      toast.success('Successfully signed in with Google!');
+    } catch (error: any) {
+      console.error('[Auth] Google sign in error:', error);
+      toast.error('Failed to sign in with Google');
+      throw error;
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      setIsAdmin(false);
+      toast.success('Successfully signed out');
+    } catch (error) {
+      console.error('[Auth] Sign out error:', error);
+      toast.error('Failed to sign out');
+      throw error;
+    }
+  }, []);
+
+  const updateUserCredits = useCallback(async (userId: string, amount: number) => {
+    if (!user) throw new Error('No authenticated user');
+
+    try {
+      const userRef = doc(db, 'users', userId);
+      const newCredits = user.credits + amount;
+      await updateDoc(userRef, { credits: newCredits });
+      setUser(prev => prev ? { ...prev, credits: newCredits } : null);
+    } catch (error) {
+      console.error('[Auth] Credits update error:', error);
+      throw error;
+    }
+  }, [user]);
+
+  const updateProfile = useCallback(async (data: { name: string; email: string }) => {
+    if (!user) throw new Error('No authenticated user');
+
+    try {
+      const userRef = doc(db, 'users', user.id);
+      await updateDoc(userRef, {
+        name: data.name,
+        email: data.email
+      });
+      setUser(prev => prev ? { ...prev, ...data } : null);
+      toast.success('Profile updated successfully');
+    } catch (error) {
+      console.error('[Auth] Profile update error:', error);
+      toast.error('Failed to update profile');
+      throw error;
+    }
+  }, [user]);
+
+  const deleteAccount = useCallback(async () => {
+    if (!user) throw new Error('No authenticated user');
+
+    try {
+      const userRef = doc(db, 'users', user.id);
+      await updateDoc(userRef, { deleted: true });
+      await auth.currentUser?.delete();
+      setUser(null);
+      toast.success('Account deleted successfully');
+    } catch (error) {
+      console.error('[Auth] Account deletion error:', error);
+      toast.error('Failed to delete account');
+      throw error;
+    }
+  }, [user]);
+
+  const revertToUser = useCallback(async () => {
+    if (!user) throw new Error('No authenticated user');
+
+    try {
+      const userRef = doc(db, 'users', user.id);
+      const newRole = {
+        type: 'user',
+        verified: false,
+        createdAt: new Date().toISOString()
+      };
+      await updateDoc(userRef, { role: newRole });
+      setUser(prev => prev ? { ...prev, role: newRole } : null);
+      toast.success('Successfully reverted to user account');
+    } catch (error) {
+      console.error('[Auth] Revert to user error:', error);
+      toast.error('Failed to revert account');
+      throw error;
+    }
+  }, [user]);
+
+  const switchToArtist = useCallback(async () => {
+    if (!user) throw new Error('No authenticated user');
+
+    try {
+      const userRef = doc(db, 'users', user.id);
+      const newRole = {
+        type: 'artist',
+        verified: true,
+        createdAt: new Date().toISOString()
+      };
+      await updateDoc(userRef, { role: newRole });
+      setUser(prev => prev ? { ...prev, role: newRole } : null);
+      toast.success('Successfully switched to artist account');
+    } catch (error) {
+      console.error('[Auth] Switch to artist error:', error);
+      toast.error('Failed to switch to artist account');
+      throw error;
+    }
+  }, [user]);
+
+  if (!authInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        isAdmin,
+        signIn,
+        signInWithGoogle,
+        logout,
+        updateUserCredits,
+        updateProfile,
+        deleteAccount,
+        revertToUser,
+        switchToArtist
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        if (firebaseUser) {
-          const userRef = doc(db, 'users', firebaseUser.uid);
-          const userDoc = await getDoc(userRef);
-
-          if (userDoc.exists()) {
-            setUser({
-              id: firebaseUser.uid,
-              uid: firebaseUser.uid,
-              displayName: firebaseUser.displayName,
-              email: firebaseUser.email,
-              photoURL: firebaseUser.photoURL,
-              ...userDoc.data()
-            });
-          } else {
-            const newUser = {
-              id: firebaseUser.uid,
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: firebaseUser.displayName || 'User',
-              displayName: firebaseUser.displayName,
-              photoURL: firebaseUser.photoURL,
-              role: {
-                type: 'user',
-                verified: false,
-                createdAt: new Date().toISOString()
-              },
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-
-            await setDoc(userRef, newUser);
-            setUser(newUser);
-          }
-        } else {
-          setUser(null);
-        }
-      } catch (error) {
-        console.error('[Auth] State observer error:', error);
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const signInWithGoogle = async () => {
-    try {
-      console.log('[Auth] Initiating Google sign-in...');
-      
-      // Clear any previous errors
-      setError(null);
-
-      // Use signInWithPopup with the configured googleProvider
-      await signInWithPopup(auth, googleProvider);
-      showSuccessToast('Successfully signed in with Google!');
-    } catch (error) {
-      console.error('[Auth] Google sign-in error:', error, {
-        code: (error as AuthError)?.code,
-        message: (error as AuthError)?.message,
-        browser: navigator.userAgent
-      });
-      
-      // Handle specific error cases
-      if ((error as AuthError)?.code === 'auth/popup-blocked') {
-        showErrorToast('Please allow popups for this site');
-        // Fallback to redirect method if popup is blocked
-        try {
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        } catch (redirectError) {
-          console.error('[Auth] Redirect fallback error:', redirectError);
-        }
-      } else if ((error as AuthError)?.code === 'auth/popup-closed-by-user') {
-        showErrorToast('Sign-in was cancelled');
-      } else if ((error as AuthError)?.code === 'auth/internal-error') {
-        showErrorToast('An error occurred. Please try again in a few moments.');
-        // Log additional details for debugging
-        console.error('[Auth] Internal error details:', {
-          authInstance: !!auth,
-          providerInstance: !!googleProvider,
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        showErrorToast('Failed to sign in with Google');
-      }
-      throw error;
-    }
-  };
-
-  const signIn = async (email: string, password: string) => {
-    try {
-      setError(null);
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (err) {
-      console.error('Error signing in:', err);
-      setError(err instanceof Error ? err.message : 'Failed to sign in');
-      throw err;
-    }
-  };
-
-  const signUp = async (email: string, password: string) => {
-    try {
-      setError(null);
-      const result = await createUserWithEmailAndPassword(auth, email, password);
-      
-      await setDoc(doc(db, 'users', result.user.uid), {
-        email: result.user.email,
-        role: { type: 'user' },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.error('Error signing up:', err);
-      setError(err instanceof Error ? err.message : 'Failed to sign up');
-      throw err;
-    }
-  };
-
-  const logout = async () => {
-    try {
-      setError(null);
-      await signOut(auth);
-      setUser(null);
-    } catch (err) {
-      console.error('Error signing out:', err);
-      setError(err instanceof Error ? err.message : 'Failed to sign out');
-      throw err;
-    }
-  };
-
-  const resetPassword = async (email: string) => {
-    try {
-      setError(null);
-      await sendPasswordResetEmail(auth, email);
-    } catch (err) {
-      console.error('Error resetting password:', err);
-      setError(err instanceof Error ? err.message : 'Failed to reset password');
-      throw err;
-    }
-  };
-
-  const value = {
-    user,
-    loading,
-    error,
-    signIn,
-    signUp,
-    signInWithGoogle,
-    logout,
-    resetPassword,
-  };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
 }

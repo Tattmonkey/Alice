@@ -1,83 +1,67 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot,
+  collection,
   doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  addDoc,
   updateDoc,
   deleteDoc,
-  addDoc,
-  getDocs,
-  getDoc,
-  writeBatch,
-  serverTimestamp,
-  Timestamp
+  onSnapshot,
+  Timestamp,
+  serverTimestamp
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '../config/firebase';
+import { db } from '../lib/firebase/init';
 import { useAuth } from './AuthContext';
-import { 
-  Booking, 
-  ArtistService, 
-  ArtistAvailability, 
-  BookingStats,
-  DaySchedule,
-  TimeSlot,
-  BookingFilter,
-  BookingContextType,
-  BookingAttachment
-} from '../types/booking';
-import { addDays, format, parse, isWithinInterval } from 'date-fns';
+import { Booking, BookingStatus, TimeSlot } from '../types/booking';
 import toast from 'react-hot-toast';
 
-const BookingContext = createContext<BookingContextType | null>(null);
+interface BookingContextType {
+  bookings: Booking[];
+  loading: boolean;
+  createBooking: (bookingData: Omit<Booking, 'id' | 'status' | 'createdAt'>) => Promise<string>;
+  updateBookingStatus: (bookingId: string, status: BookingStatus) => Promise<void>;
+  cancelBooking: (bookingId: string) => Promise<void>;
+  getBooking: (bookingId: string) => Promise<Booking | null>;
+  getArtistBookings: (artistId: string) => Promise<Booking[]>;
+  getUserBookings: (userId: string) => Promise<Booking[]>;
+  checkTimeSlotAvailability: (artistId: string, timeSlot: TimeSlot) => Promise<boolean>;
+}
 
-export const useBooking = () => {
-  const context = useContext(BookingContext);
-  if (!context) {
-    throw new Error('useBooking must be used within a BookingProvider');
-  }
-  return context;
-};
+const BookingContext = createContext<BookingContextType | undefined>(undefined);
 
 export function BookingProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [artistServices, setArtistServices] = useState<ArtistService[]>([]);
-  const [availability, setAvailability] = useState<ArtistAvailability[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<BookingStats | null>(null);
+  const { user } = useAuth();
 
-  // Subscribe to bookings
+  // Subscribe to user's bookings
   useEffect(() => {
-    if (!user) return;
-
-    const isArtist = user.role?.type === 'artist';
-    const field = isArtist ? 'artistId' : 'userId';
+    if (!user) {
+      setBookings([]);
+      setLoading(false);
+      return;
+    }
 
     const q = query(
       collection(db, 'bookings'),
-      where(field, '==', user.id),
-      orderBy('date', 'desc')
+      where('userId', '==', user.id)
     );
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
         const bookingData = snapshot.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id
+          id: doc.id,
+          ...doc.data()
         })) as Booking[];
-        
         setBookings(bookingData);
         setLoading(false);
       },
-      (err) => {
-        console.error('Bookings subscription error:', err);
-        setError('Failed to load bookings');
+      (error) => {
+        console.error('[Bookings] Subscription error:', error);
         setLoading(false);
       }
     );
@@ -85,673 +69,181 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [user]);
 
-  // Subscribe to artist services
-  useEffect(() => {
-    if (!user || user.role?.type !== 'artist') return;
-
-    const q = query(
-      collection(db, 'artistServices'),
-      where('artistId', '==', user.id)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const serviceData = snapshot.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id
-        })) as ArtistService[];
-        
-        setArtistServices(serviceData);
-      },
-      (err) => {
-        console.error('Services subscription error:', err);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [user]);
-
-  // Subscribe to artist availability
-  useEffect(() => {
-    if (!user || user.role?.type !== 'artist') return;
-
-    const q = query(
-      collection(db, 'artistAvailability'),
-      where('artistId', '==', user.id)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const availabilityData = snapshot.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id
-        })) as ArtistAvailability[];
-        
-        setAvailability(availabilityData);
-      },
-      (err) => {
-        console.error('Availability subscription error:', err);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [user]);
-
-  const createBooking = async (data: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-    if (!user) throw new Error('Must be logged in to create bookings');
-
+  const createBooking = useCallback(async (bookingData: Omit<Booking, 'id' | 'status' | 'createdAt'>) => {
     try {
-      // Verify service exists and is active
-      const serviceRef = doc(db, 'artistServices', data.serviceId);
-      const serviceDoc = await getDoc(serviceRef);
-      
-      if (!serviceDoc.exists()) {
-        throw new Error('Service not found');
-      }
-
-      const service = serviceDoc.data() as ArtistService;
-      if (!service.active) {
-        throw new Error('Service is not currently available');
-      }
-
-      // Verify artist availability
-      const slots = await getArtistAvailability(
-        data.artistId,
-        data.date,
-        data.date
+      // Check if time slot is still available
+      const isAvailable = await checkTimeSlotAvailability(
+        bookingData.artistId,
+        bookingData.timeSlot
       );
 
-      const requestedSlot = slots[0]?.slots.find(
-        slot => slot.startTime === data.startTime && slot.endTime === data.endTime
-      );
-
-      if (!requestedSlot?.available) {
-        throw new Error('Selected time slot is not available');
+      if (!isAvailable) {
+        throw new Error('Time slot is no longer available');
       }
 
-      // Create booking document
-      const bookingData = {
-        ...data,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+      const newBooking = {
+        ...bookingData,
+        status: 'pending' as BookingStatus,
+        createdAt: serverTimestamp()
       };
 
-      const docRef = await addDoc(collection(db, 'bookings'), bookingData);
-      toast.success('Booking created successfully');
+      const docRef = await addDoc(collection(db, 'bookings'), newBooking);
       
+      // Update user's bookings array
+      if (user) {
+        const userRef = doc(db, 'users', user.id);
+        await updateDoc(userRef, {
+          bookings: [...user.bookings, docRef.id]
+        });
+      }
+
+      toast.success('Booking created successfully');
       return docRef.id;
-    } catch (err) {
-      console.error('Error creating booking:', err);
+    } catch (error) {
+      console.error('[Bookings] Create error:', error);
       toast.error('Failed to create booking');
-      throw err;
+      throw error;
     }
-  };
+  }, [user]);
 
-  const updateBooking = async (bookingId: string, data: Partial<Booking>) => {
-    if (!user) throw new Error('Must be logged in to update bookings');
-
+  const updateBookingStatus = useCallback(async (bookingId: string, status: BookingStatus) => {
     try {
       const bookingRef = doc(db, 'bookings', bookingId);
-      const bookingDoc = await getDoc(bookingRef);
-
-      if (!bookingDoc.exists()) {
-        throw new Error('Booking not found');
-      }
-
-      const booking = bookingDoc.data() as Booking;
-
-      // Verify user has permission
-      if (booking.userId !== user.id && booking.artistId !== user.id && user.role?.type !== 'admin') {
-        throw new Error('Unauthorized to update this booking');
-      }
-
-      await updateDoc(bookingRef, {
-        ...data,
-        updatedAt: new Date().toISOString()
+      await updateDoc(bookingRef, { 
+        status,
+        updatedAt: serverTimestamp()
       });
-
-      toast.success('Booking updated successfully');
-    } catch (err) {
-      console.error('Error updating booking:', err);
-      toast.error('Failed to update booking');
-      throw err;
+      toast.success(`Booking ${status}`);
+    } catch (error) {
+      console.error('[Bookings] Status update error:', error);
+      toast.error('Failed to update booking status');
+      throw error;
     }
-  };
+  }, []);
 
-  const cancelBooking = async (bookingId: string, reason: string) => {
-    if (!user) throw new Error('Must be logged in to cancel bookings');
-
+  const cancelBooking = useCallback(async (bookingId: string) => {
     try {
       const bookingRef = doc(db, 'bookings', bookingId);
       const bookingDoc = await getDoc(bookingRef);
-
+      
       if (!bookingDoc.exists()) {
         throw new Error('Booking not found');
       }
 
       const booking = bookingDoc.data() as Booking;
-
-      // Verify user has permission
-      if (booking.userId !== user.id && booking.artistId !== user.id && user.role?.type !== 'admin') {
-        throw new Error('Unauthorized to cancel this booking');
+      
+      // Only allow cancellation of pending or confirmed bookings
+      if (!['pending', 'confirmed'].includes(booking.status)) {
+        throw new Error(`Cannot cancel booking with status: ${booking.status}`);
       }
 
       await updateDoc(bookingRef, {
         status: 'cancelled',
-        notes: `${booking.notes ? booking.notes + '\n' : ''}Cancelled: ${reason}`,
-        updatedAt: new Date().toISOString()
+        updatedAt: serverTimestamp()
       });
+
+      // Remove from user's bookings array
+      if (user) {
+        const userRef = doc(db, 'users', user.id);
+        await updateDoc(userRef, {
+          bookings: user.bookings.filter(id => id !== bookingId)
+        });
+      }
 
       toast.success('Booking cancelled successfully');
-    } catch (err) {
-      console.error('Error cancelling booking:', err);
+    } catch (error) {
+      console.error('[Bookings] Cancel error:', error);
       toast.error('Failed to cancel booking');
-      throw err;
+      throw error;
     }
-  };
+  }, [user]);
 
-  const getArtistAvailability = async (
-    artistId: string,
-    startDate: string,
-    endDate: string
-  ): Promise<DaySchedule[]> => {
+  const getBooking = useCallback(async (bookingId: string): Promise<Booking | null> => {
     try {
-      // Get artist's availability settings
-      const availabilityQuery = query(
-        collection(db, 'artistAvailability'),
+      const bookingDoc = await getDoc(doc(db, 'bookings', bookingId));
+      if (!bookingDoc.exists()) return null;
+      return { id: bookingDoc.id, ...bookingDoc.data() } as Booking;
+    } catch (error) {
+      console.error('[Bookings] Get booking error:', error);
+      throw error;
+    }
+  }, []);
+
+  const getArtistBookings = useCallback(async (artistId: string): Promise<Booking[]> => {
+    try {
+      const q = query(
+        collection(db, 'bookings'),
         where('artistId', '==', artistId)
       );
-      const availabilityDocs = await getDocs(availabilityQuery);
-      const availabilitySettings = availabilityDocs.docs.map(
-        doc => doc.data()
-      ) as ArtistAvailability[];
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Booking[];
+    } catch (error) {
+      console.error('[Bookings] Get artist bookings error:', error);
+      throw error;
+    }
+  }, []);
 
-      // Get existing bookings
-      const bookingsQuery = query(
+  const getUserBookings = useCallback(async (userId: string): Promise<Booking[]> => {
+    try {
+      const q = query(
+        collection(db, 'bookings'),
+        where('userId', '==', userId)
+      );
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Booking[];
+    } catch (error) {
+      console.error('[Bookings] Get user bookings error:', error);
+      throw error;
+    }
+  }, []);
+
+  const checkTimeSlotAvailability = useCallback(async (artistId: string, timeSlot: TimeSlot): Promise<boolean> => {
+    try {
+      const q = query(
         collection(db, 'bookings'),
         where('artistId', '==', artistId),
-        where('date', '>=', startDate),
-        where('date', '<=', endDate),
+        where('timeSlot.date', '==', timeSlot.date),
+        where('timeSlot.time', '==', timeSlot.time),
         where('status', 'in', ['pending', 'confirmed'])
       );
-      const bookingDocs = await getDocs(bookingsQuery);
-      const existingBookings = bookingDocs.docs.map(
-        doc => doc.data()
-      ) as Booking[];
-
-      // Generate schedule for each day
-      const schedule: DaySchedule[] = [];
-      let currentDate = new Date(startDate);
-      const end = new Date(endDate);
-
-      while (currentDate <= end) {
-        const dayOfWeek = currentDate.getDay();
-        const dateStr = format(currentDate, 'yyyy-MM-dd');
-        
-        // Find availability settings for this day
-        const artistAvailability = availabilitySettings[0]; // Assuming one availability record per artist
-        if (!artistAvailability) continue;
-
-        // Check if date is blocked
-        if (artistAvailability.blockedDates.includes(dateStr)) {
-          schedule.push({
-            date: dateStr,
-            slots: [],
-            isAvailable: false,
-            totalBookings: 0
-          });
-          currentDate = addDays(currentDate, 1);
-          continue;
-        }
-
-        // Check for custom availability
-        const customSlot = artistAvailability.customAvailability.find(
-          slot => slot.date === dateStr
-        );
-
-        // Find regular hours for this day
-        const regularHours = artistAvailability.regularHours.find(
-          h => h.day === dayOfWeek
-        );
-
-        if (customSlot) {
-          // Use custom slot if available
-          if (customSlot.isAvailable) {
-            const slots: TimeSlot[] = [];
-            let slotStart = parse(customSlot.startTime, 'HH:mm', currentDate);
-            const slotEnd = parse(customSlot.endTime, 'HH:mm', currentDate);
-
-            while (slotStart < slotEnd) {
-              const startTimeStr = format(slotStart, 'HH:mm');
-              const endTimeStr = format(addDays(slotStart, 30), 'HH:mm');
-
-              // Check if slot conflicts with existing bookings
-              const conflictingBooking = existingBookings.find(booking => 
-                booking.date === dateStr &&
-                isWithinInterval(parse(startTimeStr, 'HH:mm', currentDate), {
-                  start: parse(booking.startTime, 'HH:mm', currentDate),
-                  end: parse(booking.endTime, 'HH:mm', currentDate)
-                })
-              );
-
-              slots.push({
-                startTime: startTimeStr,
-                endTime: endTimeStr,
-                available: !conflictingBooking,
-                existingBooking: conflictingBooking
-              });
-
-              slotStart = addDays(slotStart, 30);
-            }
-
-            schedule.push({
-              date: dateStr,
-              slots,
-              isAvailable: true,
-              totalBookings: existingBookings.filter(b => b.date === dateStr).length
-            });
-          } else {
-            schedule.push({
-              date: dateStr,
-              slots: [],
-              isAvailable: false,
-              totalBookings: 0
-            });
-          }
-        } else if (regularHours && regularHours.isAvailable) {
-          // Use regular hours
-          const slots: TimeSlot[] = [];
-          let slotStart = parse(regularHours.startTime, 'HH:mm', currentDate);
-          const slotEnd = parse(regularHours.endTime, 'HH:mm', currentDate);
-
-          while (slotStart < slotEnd) {
-            const startTimeStr = format(slotStart, 'HH:mm');
-            const endTimeStr = format(addDays(slotStart, 30), 'HH:mm');
-
-            // Check if slot conflicts with existing bookings
-            const conflictingBooking = existingBookings.find(booking => 
-              booking.date === dateStr &&
-              isWithinInterval(parse(startTimeStr, 'HH:mm', currentDate), {
-                start: parse(booking.startTime, 'HH:mm', currentDate),
-                end: parse(booking.endTime, 'HH:mm', currentDate)
-              })
-            );
-
-            slots.push({
-              startTime: startTimeStr,
-              endTime: endTimeStr,
-              available: !conflictingBooking,
-              existingBooking: conflictingBooking
-            });
-
-            slotStart = addDays(slotStart, 30);
-          }
-
-          schedule.push({
-            date: dateStr,
-            slots,
-            isAvailable: true,
-            totalBookings: existingBookings.filter(b => b.date === dateStr).length
-          });
-        } else {
-          schedule.push({
-            date: dateStr,
-            slots: [],
-            isAvailable: false,
-            totalBookings: 0
-          });
-        }
-
-        currentDate = addDays(currentDate, 1);
-      }
-
-      return schedule;
-    } catch (err) {
-      console.error('Error getting artist availability:', err);
-      throw err;
-    }
-  };
-
-  const createService = async (data: Omit<ArtistService, 'id'>): Promise<string> => {
-    if (!user || user.role?.type !== 'artist') {
-      throw new Error('Must be an artist to create services');
-    }
-
-    try {
-      const docRef = await addDoc(collection(db, 'artistServices'), {
-        ...data,
-        artistId: user.id
-      });
-
-      toast.success('Service created successfully');
-      return docRef.id;
-    } catch (err) {
-      console.error('Error creating service:', err);
-      toast.error('Failed to create service');
-      throw err;
-    }
-  };
-
-  const updateService = async (serviceId: string, data: Partial<ArtistService>) => {
-    if (!user || user.role?.type !== 'artist') {
-      throw new Error('Must be an artist to update services');
-    }
-
-    try {
-      const serviceRef = doc(db, 'artistServices', serviceId);
-      const serviceDoc = await getDoc(serviceRef);
-
-      if (!serviceDoc.exists()) {
-        throw new Error('Service not found');
-      }
-
-      const service = serviceDoc.data() as ArtistService;
-
-      if (service.artistId !== user.id) {
-        throw new Error('Unauthorized to update this service');
-      }
-
-      await updateDoc(serviceRef, data);
-      toast.success('Service updated successfully');
-    } catch (err) {
-      console.error('Error updating service:', err);
-      toast.error('Failed to update service');
-      throw err;
-    }
-  };
-
-  const deleteService = async (serviceId: string) => {
-    if (!user || user.role?.type !== 'artist') {
-      throw new Error('Must be an artist to delete services');
-    }
-
-    try {
-      const serviceRef = doc(db, 'artistServices', serviceId);
-      const serviceDoc = await getDoc(serviceRef);
-
-      if (!serviceDoc.exists()) {
-        throw new Error('Service not found');
-      }
-
-      const service = serviceDoc.data() as ArtistService;
-
-      if (service.artistId !== user.id) {
-        throw new Error('Unauthorized to delete this service');
-      }
-
-      // Check for existing bookings using this service
-      const bookingsQuery = query(
-        collection(db, 'bookings'),
-        where('serviceId', '==', serviceId),
-        where('status', 'in', ['pending', 'confirmed'])
-      );
-      const bookingDocs = await getDocs(bookingsQuery);
-
-      if (!bookingDocs.empty) {
-        throw new Error('Cannot delete service with active bookings');
-      }
-
-      await deleteDoc(serviceRef);
-      toast.success('Service deleted successfully');
-    } catch (err) {
-      console.error('Error deleting service:', err);
-      toast.error('Failed to delete service');
-      throw err;
-    }
-  };
-
-  const updateAvailability = async (availabilityId: string, data: Partial<ArtistAvailability>) => {
-    if (!user || user.role?.type !== 'artist') {
-      throw new Error('Must be an artist to update availability');
-    }
-
-    try {
-      const availabilityRef = doc(db, 'artistAvailability', availabilityId);
-      await updateDoc(availabilityRef, data);
-      toast.success('Availability updated successfully');
-    } catch (err) {
-      console.error('Error updating availability:', err);
-      toast.error('Failed to update availability');
-      throw err;
-    }
-  };
-
-  const addAttachment = async (bookingId: string, file: File) => {
-    if (!user) throw new Error('Must be logged in to add attachments');
-
-    try {
-      const bookingRef = doc(db, 'bookings', bookingId);
-      const bookingDoc = await getDoc(bookingRef);
-
-      if (!bookingDoc.exists()) {
-        throw new Error('Booking not found');
-      }
-
-      const booking = bookingDoc.data() as Booking;
-
-      // Verify user has permission
-      if (booking.userId !== user.id && booking.artistId !== user.id) {
-        throw new Error('Unauthorized to add attachments to this booking');
-      }
-
-      // Upload file
-      const timestamp = Date.now();
-      const filename = `${bookingId}_${timestamp}_${file.name}`;
-      const storageRef = ref(storage, `booking-attachments/${bookingId}/${filename}`);
       
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-
-      // Add attachment to booking
-      const attachment: BookingAttachment = {
-        id: `${timestamp}`,
-        type: file.type.startsWith('image/') ? 'image' : 'document',
-        url,
-        name: file.name,
-        size: file.size,
-        uploadedAt: new Date().toISOString()
-      };
-
-      await updateDoc(bookingRef, {
-        attachments: [...(booking.attachments || []), attachment],
-        updatedAt: new Date().toISOString()
-      });
-
-      toast.success('Attachment added successfully');
-    } catch (err) {
-      console.error('Error adding attachment:', err);
-      toast.error('Failed to add attachment');
-      throw err;
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.empty;
+    } catch (error) {
+      console.error('[Bookings] Check availability error:', error);
+      throw error;
     }
-  };
-
-  const removeAttachment = async (bookingId: string, attachmentId: string) => {
-    if (!user) throw new Error('Must be logged in to remove attachments');
-
-    try {
-      const bookingRef = doc(db, 'bookings', bookingId);
-      const bookingDoc = await getDoc(bookingRef);
-
-      if (!bookingDoc.exists()) {
-        throw new Error('Booking not found');
-      }
-
-      const booking = bookingDoc.data() as Booking;
-
-      // Verify user has permission
-      if (booking.userId !== user.id && booking.artistId !== user.id) {
-        throw new Error('Unauthorized to remove attachments from this booking');
-      }
-
-      const attachment = booking.attachments?.find(a => a.id === attachmentId);
-      if (!attachment) {
-        throw new Error('Attachment not found');
-      }
-
-      // Delete file from storage
-      const filename = attachment.url.split('/').pop();
-      if (filename) {
-        const storageRef = ref(storage, `booking-attachments/${bookingId}/${filename}`);
-        await deleteObject(storageRef);
-      }
-
-      // Remove attachment from booking
-      await updateDoc(bookingRef, {
-        attachments: booking.attachments?.filter(a => a.id !== attachmentId) || [],
-        updatedAt: new Date().toISOString()
-      });
-
-      toast.success('Attachment removed successfully');
-    } catch (err) {
-      console.error('Error removing attachment:', err);
-      toast.error('Failed to remove attachment');
-      throw err;
-    }
-  };
-
-  const getBookingStats = async (filter?: BookingFilter): Promise<BookingStats> => {
-    try {
-      let q = query(collection(db, 'bookings'));
-
-      if (filter?.status) {
-        q = query(q, where('status', 'in', filter.status));
-      }
-      if (filter?.startDate) {
-        q = query(q, where('date', '>=', filter.startDate));
-      }
-      if (filter?.endDate) {
-        q = query(q, where('date', '<=', filter.endDate));
-      }
-      if (filter?.artistId) {
-        q = query(q, where('artistId', '==', filter.artistId));
-      }
-      if (filter?.userId) {
-        q = query(q, where('userId', '==', filter.userId));
-      }
-      if (filter?.serviceId) {
-        q = query(q, where('serviceId', '==', filter.serviceId));
-      }
-
-      const snapshot = await getDocs(q);
-      const bookings = snapshot.docs.map(doc => doc.data() as Booking);
-
-      // Calculate stats
-      const stats: BookingStats = {
-        totalBookings: bookings.length,
-        completedBookings: bookings.filter(b => b.status === 'completed').length,
-        cancelledBookings: bookings.filter(b => b.status === 'cancelled').length,
-        noShows: bookings.filter(b => b.status === 'no_show').length,
-        totalRevenue: bookings
-          .filter(b => b.status === 'completed')
-          .reduce((sum, b) => sum + b.price, 0),
-        averageRating: 0, // TODO: Implement ratings
-        popularServices: [],
-        bookingsByStatus: {
-          pending: 0,
-          confirmed: 0,
-          completed: 0,
-          cancelled: 0,
-          no_show: 0
-        },
-        bookingsByMonth: []
-      };
-
-      // Calculate bookings by status
-      bookings.forEach(booking => {
-        stats.bookingsByStatus[booking.status]++;
-      });
-
-      // Calculate bookings by month
-      const monthlyData = bookings.reduce((acc, booking) => {
-        const month = booking.date.substring(0, 7); // YYYY-MM
-        if (!acc[month]) {
-          acc[month] = { bookings: 0, revenue: 0 };
-        }
-        acc[month].bookings++;
-        if (booking.status === 'completed') {
-          acc[month].revenue += booking.price;
-        }
-        return acc;
-      }, {} as Record<string, { bookings: number; revenue: number }>);
-
-      stats.bookingsByMonth = Object.entries(monthlyData)
-        .map(([month, data]) => ({
-          month,
-          bookings: data.bookings,
-          revenue: data.revenue
-        }))
-        .sort((a, b) => a.month.localeCompare(b.month));
-
-      // Calculate popular services
-      const serviceBookings = bookings.reduce((acc, booking) => {
-        if (!acc[booking.serviceId]) {
-          acc[booking.serviceId] = { bookings: 0, name: '' };
-        }
-        acc[booking.serviceId].bookings++;
-        return acc;
-      }, {} as Record<string, { bookings: number; name: string }>);
-
-      // Get service names
-      for (const serviceId of Object.keys(serviceBookings)) {
-        const serviceDoc = await getDoc(doc(db, 'artistServices', serviceId));
-        if (serviceDoc.exists()) {
-          const service = serviceDoc.data() as ArtistService;
-          serviceBookings[serviceId].name = service.name;
-        }
-      }
-
-      stats.popularServices = Object.entries(serviceBookings)
-        .map(([serviceId, data]) => ({
-          serviceId,
-          name: data.name,
-          bookings: data.bookings
-        }))
-        .sort((a, b) => b.bookings - a.bookings)
-        .slice(0, 5);
-
-      return stats;
-    } catch (err) {
-      console.error('Error getting booking stats:', err);
-      throw err;
-    }
-  };
-
-  const refreshStats = async () => {
-    try {
-      const newStats = await getBookingStats();
-      setStats(newStats);
-    } catch (err) {
-      console.error('Error refreshing stats:', err);
-      toast.error('Failed to refresh stats');
-    }
-  };
-
-  const value = {
-    bookings,
-    artistServices,
-    availability,
-    loading,
-    error,
-    stats,
-    createBooking,
-    updateBooking,
-    cancelBooking,
-    getArtistAvailability,
-    createService,
-    updateService,
-    deleteService,
-    updateAvailability,
-    addAttachment,
-    removeAttachment,
-    getBookingStats,
-    refreshStats
-  };
+  }, []);
 
   return (
-    <BookingContext.Provider value={value}>
+    <BookingContext.Provider
+      value={{
+        bookings,
+        loading,
+        createBooking,
+        updateBookingStatus,
+        cancelBooking,
+        getBooking,
+        getArtistBookings,
+        getUserBookings,
+        checkTimeSlotAvailability
+      }}
+    >
       {children}
     </BookingContext.Provider>
   );
+}
+
+export function useBooking() {
+  const context = useContext(BookingContext);
+  if (!context) {
+    throw new Error('useBooking must be used within a BookingProvider');
+  }
+  return context;
 }
