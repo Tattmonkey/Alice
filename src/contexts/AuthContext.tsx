@@ -64,40 +64,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userDoc = await getDoc(userRef);
 
           if (userDoc.exists()) {
+            const userData = userDoc.data();
             setUser({
               id: firebaseUser.uid,
               uid: firebaseUser.uid,
               displayName: firebaseUser.displayName,
               email: firebaseUser.email,
               photoURL: firebaseUser.photoURL,
-              ...userDoc.data()
+              role: userData.role || { type: 'user', verified: true, createdAt: new Date().toISOString() },
+              ...userData
             });
           } else {
+            // Create new user document if it doesn't exist
             const newUser = {
               id: firebaseUser.uid,
               uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: firebaseUser.displayName || 'User',
               displayName: firebaseUser.displayName,
+              email: firebaseUser.email,
               photoURL: firebaseUser.photoURL,
-              role: {
-                type: 'user',
-                verified: false,
-                createdAt: new Date().toISOString()
-              },
+              role: { type: 'user', verified: true, createdAt: new Date().toISOString() },
               createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
             };
-
             await setDoc(userRef, newUser);
             setUser(newUser);
           }
         } else {
           setUser(null);
         }
-      } catch (error) {
-        console.error('[Auth] State observer error:', error);
-        setUser(null);
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch user data');
       } finally {
         setLoading(false);
       }
@@ -207,39 +204,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) throw new Error('No user logged in');
     
     try {
+      console.log('Starting artist conversion for user:', user.uid);
       const userRef = doc(db, 'users', user.uid);
       const artistRef = doc(db, 'artists', user.uid);
       
+      const newRole = {
+        type: 'artist',
+        verified: false,
+        createdAt: new Date().toISOString()
+      };
+
+      console.log('Updating user role:', newRole);
       // Update user role
       await setDoc(userRef, {
-        role: {
-          type: 'artist',
-          verified: false,
-          createdAt: new Date().toISOString()
-        },
+        role: newRole,
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
+      console.log('Creating artist profile');
       // Create artist profile
       await setDoc(artistRef, {
         userId: user.uid,
+        displayName: user.displayName || '',
+        email: user.email || '',
+        photoURL: user.photoURL || '',
         createdAt: new Date().toISOString(),
         status: 'pending',
-        verified: false
-      }, { merge: true });
+        verified: false,
+        bio: '',
+        specialties: [],
+        location: '',
+        socialLinks: {}
+      });
 
+      console.log('Updating local user state');
       // Update local user state
-      setUser(prev => prev ? {
-        ...prev,
-        role: {
-          type: 'artist',
-          verified: false,
-          createdAt: new Date().toISOString()
-        }
-      } : null);
+      setUser(prev => {
+        if (!prev) return null;
+        const updatedUser = {
+          ...prev,
+          role: newRole
+        };
+        console.log('Updated user state:', updatedUser);
+        return updatedUser;
+      });
 
       showSuccessToast('Successfully converted to artist account');
     } catch (error) {
+      console.error('Error converting to artist:', error);
       showErrorToast('Failed to convert account');
       throw error;
     }
@@ -277,6 +289,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       showSuccessToast('Successfully reverted to user account');
     } catch (error) {
+      console.error('Error reverting to user:', error);
       showErrorToast('Failed to revert account');
       throw error;
     }

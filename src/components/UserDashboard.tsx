@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -21,21 +21,33 @@ export default function UserDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
 
+  useEffect(() => {
+    console.log('UserDashboard mounted, user:', user);
+  }, [user]);
+
   const handleArtistConversion = async () => {
+    console.log('Starting artist conversion...');
     try {
       setIsConverting(true);
       setError(null);
+      console.log('Calling convertToArtist...');
       await convertToArtist();
+      console.log('Conversion successful');
       setShowConfirmation(false);
-      navigate('/artist/settings');
+      setTimeout(() => {
+        navigate('/artist/settings');
+      }, 1000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error during conversion:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred during conversion');
     } finally {
       setIsConverting(false);
     }
   };
 
+  // Check if user is already an artist
   const isArtist = user?.role?.type === 'artist';
+  console.log('Current user role:', user?.role);
 
   if (!user) {
     return (
@@ -47,14 +59,31 @@ export default function UserDashboard() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
+        Dashboard
+      </h1>
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {!isArtist && (
-          <DashboardCard
-            icon={Palette}
-            title="Become an Artist"
-            description="Convert your account to an artist account and start showcasing your work"
-            onClick={() => setShowConfirmation(true)}
-          />
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              console.log('Convert to artist clicked');
+              setShowConfirmation(true);
+            }}
+            className="cursor-pointer"
+          >
+            <DashboardCard
+              icon={Palette}
+              title="Become an Artist"
+              description="Convert your account to an artist account and start showcasing your work"
+              onClick={() => {
+                console.log('Convert to artist clicked (inner)');
+                setShowConfirmation(true);
+              }}
+            />
+          </motion.div>
         )}
         
         <DashboardCard
@@ -92,6 +121,7 @@ export default function UserDashboard() {
               animate={{ scale: 1 }}
               exit={{ scale: 0.95 }}
               className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -120,12 +150,18 @@ export default function UserDashboard() {
                   Cancel
                 </button>
                 <button
-                  onClick={handleArtistConversion}
+                  onClick={() => {
+                    console.log('Confirming artist conversion');
+                    handleArtistConversion();
+                  }}
                   disabled={isConverting}
-                  className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 flex items-center"
                 >
                   {isConverting ? (
-                    <Loader className="animate-spin" size={16} />
+                    <>
+                      <Loader className="animate-spin mr-2" size={16} />
+                      <span>Converting...</span>
+                    </>
                   ) : (
                     'Confirm'
                   )}
@@ -158,11 +194,9 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   description,
   onClick,
 }) => (
-  <motion.button
-    whileHover={{ scale: 1.02 }}
-    whileTap={{ scale: 0.98 }}
+  <div
     onClick={onClick}
-    className="w-full p-6 bg-white dark:bg-gray-800/50 rounded-xl shadow-sm hover:shadow-md transition-all text-left group"
+    className="w-full p-6 bg-white dark:bg-gray-800/50 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer group"
   >
     <div className="flex justify-between items-start">
       <Icon className="text-purple-600 dark:text-purple-400" size={24} />
@@ -174,5 +208,5 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
     <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
       {description}
     </p>
-  </motion.button>
+  </div>
 );
