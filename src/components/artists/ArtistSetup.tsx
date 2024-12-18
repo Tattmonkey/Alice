@@ -5,7 +5,7 @@ import { Upload, MapPin, Link as LinkIcon, Save, Instagram, Facebook, Twitter } 
 import { useAuth } from '../../contexts/AuthContext';
 import { storage, db } from '../../config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import { showSuccessToast, showErrorToast } from '../../utils/toast';
 
 interface SocialLinks {
@@ -104,14 +104,33 @@ export default function ArtistSetup() {
     setUploading(true);
 
     try {
-      const storageRef = ref(storage, `artists/${user.uid}/${type}/${file.name}`);
-      await uploadBytes(storageRef, file);
+      // Create a unique filename
+      const timestamp = new Date().getTime();
+      const filename = `${timestamp}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const storageRef = ref(storage, `artists/${user.uid}/${type}/${filename}`);
+      
+      // Upload the file
+      const snapshot = await uploadBytes(storageRef, file);
+      console.log('Uploaded image successfully:', snapshot);
+      
+      // Get the download URL
       const downloadURL = await getDownloadURL(storageRef);
+      console.log('Got download URL:', downloadURL);
 
+      // Update the profile state
       setProfile(prev => ({
         ...prev,
         [type === 'profile' ? 'profileImage' : 'coverImage']: downloadURL,
       }));
+
+      // If it's a profile image, also update the user's photoURL in Firebase Auth
+      if (type === 'profile') {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, {
+          photoURL: downloadURL,
+          updatedAt: new Date().toISOString(),
+        });
+      }
 
       showSuccessToast(`${type === 'profile' ? 'Profile' : 'Cover'} image uploaded successfully`);
     } catch (error) {
@@ -127,17 +146,45 @@ export default function ArtistSetup() {
     setLoading(true);
 
     try {
+      // Update artist profile
       const artistRef = doc(db, 'artists', user.uid);
-      await updateDoc(artistRef, {
+      const artistData = {
         ...profile,
+        userId: user.uid,
+        email: user.email || '',
         updatedAt: new Date().toISOString(),
-      });
+      };
+      
+      console.log('Saving artist profile:', artistData);
+      await setDoc(artistRef, artistData, { merge: true });
 
-      // Update user profile in auth context
+      // Update user profile
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         displayName: profile.displayName,
         photoURL: profile.profileImage,
+        role: {
+          type: 'artist',
+          verified: false,
+          updatedAt: new Date().toISOString(),
+        },
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Update search index
+      const searchRef = doc(db, 'search_artists', user.uid);
+      await setDoc(searchRef, {
+        userId: user.uid,
+        displayName: profile.displayName,
+        location: profile.location,
+        specialties: profile.specialties,
+        photoURL: profile.profileImage,
+        coverImage: profile.coverImage,
+        bio: profile.bio,
+        experience: profile.experience,
+        hourlyRate: profile.hourlyRate,
+        availability: profile.availability,
+        languages: profile.languages,
         updatedAt: new Date().toISOString(),
       });
 

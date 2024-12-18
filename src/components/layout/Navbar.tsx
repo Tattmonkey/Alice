@@ -71,6 +71,12 @@ export default function Navbar() {
                 <span>{link.label}</span>
               </Link>
             ))}
+            <Link
+              to="/find-artists"
+              className="text-gray-700 hover:text-purple-600 dark:text-gray-300 dark:hover:text-purple-400 px-3 py-2 rounded-md text-sm font-medium"
+            >
+              Find Artists
+            </Link>
           </div>
 
           {/* Search Bar */}
@@ -188,6 +194,12 @@ export default function Navbar() {
                   <span>{link.label}</span>
                 </Link>
               ))}
+              <Link
+                to="/find-artists"
+                className="text-gray-700 hover:text-purple-600 dark:text-gray-300 dark:hover:text-purple-400 px-3 py-2 rounded-md text-base font-medium"
+              >
+                Find Artists
+              </Link>
             </div>
 
             <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">

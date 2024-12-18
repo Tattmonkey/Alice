@@ -30,6 +30,7 @@ import UserBookings from './components/user/UserBookings';
 import ArtistDashboard from './components/artists/ArtistDashboard';
 import ArtistSettings from './components/artists/ArtistSettings';
 import ArtistSetup from './components/artists/ArtistSetup';
+import FindArtists from './components/artists/FindArtists';
 import AdminDashboard from './components/admin/AdminDashboard';
 import UserManager from './components/admin/UserManager';
 import ProductManager from './components/admin/ProductManager';
@@ -184,6 +185,10 @@ export default function App() {
                         <ArtistSetup />
                       </ArtistRoute>
                     }
+                  />
+                  <Route
+                    path="/find-artists"
+                    element={<FindArtists />}
                   />
                   
                   {/* Admin Routes */}
