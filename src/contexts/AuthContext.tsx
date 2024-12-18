@@ -16,7 +16,7 @@ import { auth, db, googleProvider } from '../config/firebase';
 import { showSuccessToast, showErrorToast } from '../utils/toast';
 import { getCurrentUser, checkUserRole } from '../utils/auth';
 
-interface User {
+export interface User {
   id: string;
   uid: string;
   displayName: string | null;
@@ -28,7 +28,7 @@ interface User {
   updatedAt?: string;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
@@ -106,44 +106,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     try {
       console.log('[Auth] Initiating Google sign-in...');
-      
-      // Clear any previous errors
       setError(null);
-
-      // Use signInWithPopup with the configured googleProvider
       await signInWithPopup(auth, googleProvider);
       showSuccessToast('Successfully signed in with Google!');
     } catch (error) {
-      console.error('[Auth] Google sign-in error:', error, {
-        code: (error as AuthError)?.code,
-        message: (error as AuthError)?.message,
-        browser: navigator.userAgent
-      });
-      
-      // Handle specific error cases
-      if ((error as AuthError)?.code === 'auth/popup-blocked') {
-        showErrorToast('Please allow popups for this site');
-        // Fallback to redirect method if popup is blocked
-        try {
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        } catch (redirectError) {
-          console.error('[Auth] Redirect fallback error:', redirectError);
-        }
-      } else if ((error as AuthError)?.code === 'auth/popup-closed-by-user') {
-        showErrorToast('Sign-in was cancelled');
-      } else if ((error as AuthError)?.code === 'auth/internal-error') {
-        showErrorToast('An error occurred. Please try again in a few moments.');
-
-        // Log additional details for debugging
-        console.error('[Auth] Internal error details:', {
-          authInstance: !!auth,
-          providerInstance: !!googleProvider,
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        showErrorToast('Failed to sign in with Google');
-      }
+      console.error('[Auth] Google sign-in error:', error);
+      showErrorToast('Failed to sign in with Google');
       throw error;
     }
   };
@@ -166,7 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       await setDoc(doc(db, 'users', result.user.uid), {
         email: result.user.email,
-        role: { type: 'user' },
+        role: { type: 'user', verified: true, createdAt: new Date().toISOString() },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -241,12 +209,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Update local user state
       setUser(prev => {
         if (!prev) return null;
-        const updatedUser = {
+        return {
           ...prev,
           role: newRole
         };
-        console.log('Updated user state:', updatedUser);
-        return updatedUser;
       });
 
       showSuccessToast('Successfully converted to artist account');
@@ -264,13 +230,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userRef = doc(db, 'users', user.uid);
       const artistRef = doc(db, 'artists', user.uid);
       
+      const newRole = {
+        type: 'user',
+        verified: true,
+        createdAt: new Date().toISOString()
+      };
+
       // Update user role
       await setDoc(userRef, {
-        role: {
-          type: 'user',
-          verified: true,
-          createdAt: new Date().toISOString()
-        },
+        role: newRole,
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
@@ -278,14 +246,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await deleteDoc(artistRef);
 
       // Update local user state
-      setUser(prev => prev ? {
-        ...prev,
-        role: {
-          type: 'user',
-          verified: true,
-          createdAt: new Date().toISOString()
-        }
-      } : null);
+      setUser(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          role: newRole
+        };
+      });
 
       showSuccessToast('Successfully reverted to user account');
     } catch (error) {
@@ -295,7 +262,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const value: AuthContextType = {
+  const value = {
     user,
     loading,
     error,
@@ -312,7 +279,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user: value.user,
     hasConvertToArtist: !!value.convertToArtist,
     loading: value.loading,
-    error: value.error
+    error: value.error,
+    userRole: value.user?.role?.type
   });
 
   return (

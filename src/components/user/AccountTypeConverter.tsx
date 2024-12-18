@@ -21,6 +21,7 @@ export default function AccountTypeConverter() {
   const handleConvertToArtist = async () => {
     if (!user || !convertToArtist) {
       console.error('No user or convertToArtist function');
+      showErrorToast('Unable to convert account at this time');
       return;
     }
     
@@ -40,6 +41,7 @@ export default function AccountTypeConverter() {
   const handleRevertToUser = async () => {
     if (!user || !revertToUser) {
       console.error('No user or revertToUser function');
+      showErrorToast('Unable to revert account at this time');
       return;
     }
     
