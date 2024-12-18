@@ -11,8 +11,18 @@ export default function AccountTypeConverter() {
   const [isConverting, setIsConverting] = useState(false);
   const navigate = useNavigate();
 
+  console.log('AccountTypeConverter:', {
+    user,
+    hasConvertToArtist: !!convertToArtist,
+    hasRevertToUser: !!revertToUser,
+    userRole: user?.role?.type
+  });
+
   const handleConvertToArtist = async () => {
-    if (!user) return;
+    if (!user || !convertToArtist) {
+      console.error('No user or convertToArtist function');
+      return;
+    }
     
     setIsConverting(true);
     try {
@@ -28,7 +38,10 @@ export default function AccountTypeConverter() {
   };
 
   const handleRevertToUser = async () => {
-    if (!user) return;
+    if (!user || !revertToUser) {
+      console.error('No user or revertToUser function');
+      return;
+    }
     
     setOpenDialog(false);
     setIsConverting(true);
@@ -44,7 +57,10 @@ export default function AccountTypeConverter() {
     }
   };
 
-  if (!user) return null;
+  if (!user) {
+    console.log('No user found');
+    return null;
+  }
 
   return (
     <div className="account-type-converter">
@@ -54,7 +70,7 @@ export default function AccountTypeConverter() {
           whileTap={{ scale: 0.98 }}
           className="w-full px-4 py-2 text-white bg-purple-600 rounded-lg shadow hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
           onClick={handleConvertToArtist}
-          disabled={isConverting}
+          disabled={isConverting || !convertToArtist}
         >
           {isConverting ? (
             <>
@@ -72,7 +88,7 @@ export default function AccountTypeConverter() {
             whileTap={{ scale: 0.98 }}
             className="w-full px-4 py-2 text-white bg-red-500 rounded-lg shadow hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
             onClick={() => setOpenDialog(true)}
-            disabled={isConverting}
+            disabled={isConverting || !revertToUser}
           >
             {isConverting ? (
               <>
