@@ -6,7 +6,7 @@ import { MessagingProvider } from './contexts/MessagingContext';
 import { GalleryProvider } from './contexts/GalleryContext';
 import { BookingProvider } from './contexts/BookingContext';
 import { User } from './contexts/AuthContext';
-import Navbar from './components/Navbar';
+import Navbar from './components/layout/Navbar';
 import Footer from './components/Footer';
 import LoginModal from './components/auth/LoginModal';
 import SignUpModal from './components/auth/SignUpModal';
@@ -85,7 +85,7 @@ export default function App() {
       <GalleryProvider>
         <BookingProvider>
           <MessagingProvider>
-            <div className="min-h-screen bg-purple-50 dark:bg-[#0f0616] transition-colors flex flex-col">
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
               <Navbar 
                 onOpenLoginModal={() => setIsLoginModalOpen(true)}
                 onOpenSignUpModal={() => setIsSignUpModalOpen(true)}

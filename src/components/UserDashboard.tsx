@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { showSuccessToast, showErrorToast } from '../utils/toast';
+import ProfileAvatar from './user/ProfileAvatar'; // Import the ProfileAvatar component
 
 export default function UserDashboard() {
   const { user, convertToArtist } = useAuth();
@@ -79,6 +80,17 @@ export default function UserDashboard() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <div className="flex items-center gap-4 mb-6">
+        <ProfileAvatar size="lg" editable={true} />
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {user?.displayName || 'Welcome!'}
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            {user?.email}
+          </p>
+        </div>
+      </div>
       <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
         Dashboard
       </h1>
