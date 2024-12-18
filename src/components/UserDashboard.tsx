@@ -13,62 +13,16 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { showSuccessToast, showErrorToast } from '../utils/toast';
-import ProfileAvatar from './user/ProfileAvatar'; // Import the ProfileAvatar component
+import ProfileAvatar from './user/ProfileAvatar';
+import AccountTypeConverter from './user/AccountTypeConverter';
 
 export default function UserDashboard() {
-  const { user, convertToArtist } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [isConverting, setIsConverting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showConfirmation, setShowConfirmation] = useState(false);
 
   useEffect(() => {
     console.log('UserDashboard mounted, user:', user);
   }, [user]);
-
-  const handleArtistConversion = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('Starting artist conversion...');
-    try {
-      if (!convertToArtist) {
-        throw new Error('convertToArtist function not available');
-      }
-      setIsConverting(true);
-      setError(null);
-      console.log('Calling convertToArtist...');
-      await convertToArtist();
-      console.log('Conversion successful');
-      showSuccessToast('Successfully converted to artist account!');
-      setShowConfirmation(false);
-      setTimeout(() => {
-        navigate('/artist/settings');
-      }, 1000);
-    } catch (err) {
-      console.error('Error during conversion:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred during conversion');
-      showErrorToast('Failed to convert account. Please try again.');
-    } finally {
-      setIsConverting(false);
-    }
-  };
-
-  const handleOpenModal = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('Opening conversion modal');
-    setShowConfirmation(true);
-  };
-
-  const handleCloseModal = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setShowConfirmation(false);
-  };
-
-  // Check if user is already an artist
-  const isArtist = user?.role?.type === 'artist';
-  console.log('Current user role:', user?.role);
 
   if (!user) {
     return (
@@ -77,6 +31,10 @@ export default function UserDashboard() {
       </div>
     );
   }
+
+  // Check if user is already an artist
+  const isArtist = user?.role?.type === 'artist';
+  console.log('Current user role:', user?.role);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -97,17 +55,7 @@ export default function UserDashboard() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {!isArtist && (
-          <button 
-            onClick={handleOpenModal}
-            className="text-left focus:outline-none"
-          >
-            <DashboardCard
-              icon={Palette}
-              title="Become an Artist"
-              description="Convert your account to an artist account and start showcasing your work"
-              onClick={handleOpenModal}
-            />
-          </button>
+          <AccountTypeConverter />
         )}
         
         <DashboardCard
@@ -131,66 +79,6 @@ export default function UserDashboard() {
           onClick={() => navigate('/settings')}
         />
       </div>
-
-      {showConfirmation && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          onClick={handleCloseModal}
-        >
-          <div
-            className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Become an Artist
-              </h3>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <p className="text-gray-600 dark:text-gray-300 mb-4">
-              Are you sure you want to convert your account to an artist account? You'll be able to:
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>Create your artist profile</li>
-                <li>Showcase your work</li>
-                <li>Accept bookings from clients</li>
-              </ul>
-            </p>
-            <div className="flex justify-end space-x-4">
-              <button
-                onClick={handleCloseModal}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500 dark:text-gray-300 dark:hover:text-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleArtistConversion}
-                disabled={isConverting}
-                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 flex items-center"
-              >
-                {isConverting ? (
-                  <>
-                    <Loader className="animate-spin mr-2" size={16} />
-                    <span>Converting...</span>
-                  </>
-                ) : (
-                  'Confirm'
-                )}
-              </button>
-            </div>
-            {error && (
-              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-md flex items-center space-x-2">
-                <AlertCircle size={16} />
-                <span>{error}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
