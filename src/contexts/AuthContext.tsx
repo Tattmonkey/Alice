@@ -196,13 +196,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         displayName: user.displayName || '',
         email: user.email || '',
         photoURL: user.photoURL || '',
+        bio: '',
+        location: '',
+        specialties: [],
+        experience: '',
+        socialLinks: {},
+        hourlyRate: '',
+        availability: '',
+        languages: ['English'],
         createdAt: new Date().toISOString(),
         status: 'pending',
-        verified: false,
-        bio: '',
-        specialties: [],
-        location: '',
-        socialLinks: {}
+        verified: false
       });
 
       console.log('Updating local user state');
