@@ -60,11 +60,6 @@ export default function UserDashboard() {
     );
   }
 
-  const handleBecomeArtist = () => {
-    console.log('Opening artist conversion modal');
-    setShowConfirmation(true);
-  };
-
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
@@ -73,18 +68,14 @@ export default function UserDashboard() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {!isArtist && (
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="cursor-pointer"
-          >
+          <div className="cursor-pointer">
             <DashboardCard
               icon={Palette}
               title="Become an Artist"
               description="Convert your account to an artist account and start showcasing your work"
-              onClick={handleBecomeArtist}
+              onClick={() => setShowConfirmation(true)}
             />
-          </motion.div>
+          </div>
         )}
         
         <DashboardCard
