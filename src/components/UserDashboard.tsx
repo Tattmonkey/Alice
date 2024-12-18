@@ -1,28 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Palette, 
-  Calendar, 
-  MessageSquare, 
-  Image as ImageIcon,
-  Settings,
-  ChevronRight,
-  Loader,
-  AlertCircle,
-  X
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Calendar, Image, MessageSquare, Settings, Brush } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { showSuccessToast, showErrorToast } from '../utils/toast';
-import ProfileAvatar from './user/ProfileAvatar';
+import { useNavigate } from 'react-router-dom';
+import UserGallery from './user/UserGallery';
+import UserMessages from './user/UserMessages';
+import UserBookings from './user/UserBookings';
+import UserSettings from './UserSettings';
 import AccountTypeConverter from './user/AccountTypeConverter';
 
 export default function UserDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    console.log('UserDashboard mounted, user:', user);
-  }, [user]);
+  const [activeTab, setActiveTab] = useState<'bookings' | 'gallery' | 'messages' | 'settings'>('bookings');
 
   if (!user) {
     return (
@@ -32,83 +22,99 @@ export default function UserDashboard() {
     );
   }
 
-  // Check if user is already an artist
-  const isArtist = user?.role?.type === 'artist';
-  console.log('Current user role:', user?.role);
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'bookings':
+        return <UserBookings />;
+      case 'gallery':
+        return <UserGallery />;
+      case 'messages':
+        return <UserMessages />;
+      case 'settings':
+        return <UserSettings />;
+      default:
+        return null;
+    }
+  };
+
+  const tabs = [
+    { id: 'bookings', label: 'My Bookings', icon: Calendar },
+    { id: 'gallery', label: 'My Gallery', icon: Image },
+    { id: 'messages', label: 'Messages', icon: MessageSquare },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ] as const;
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center gap-4 mb-6">
-        <ProfileAvatar size="lg" editable={true} />
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {user?.displayName || 'Welcome!'}
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            {user?.email}
-          </p>
-        </div>
-      </div>
-      <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
-        Dashboard
-      </h1>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex flex-col gap-8">
+          {/* Welcome Section */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                  Welcome back, {user.displayName || 'User'}!
+                </h1>
+                <p className="text-gray-600 dark:text-gray-300">
+                  Manage your bookings, view your gallery, and stay connected with artists.
+                </p>
+              </div>
+              {user.role?.type !== 'artist' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="w-full sm:w-auto"
+                >
+                  <AccountTypeConverter />
+                </motion.div>
+              )}
+              {user.role?.type === 'artist' && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate('/artist/dashboard')}
+                  className="w-full sm:w-auto px-6 py-3 bg-purple-600 text-white rounded-lg shadow hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Brush className="w-5 h-5" />
+                  Switch to Artist Dashboard
+                </motion.button>
+              )}
+            </div>
+          </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {!isArtist && (
-          <AccountTypeConverter />
-        )}
-        
-        <DashboardCard
-          icon={ImageIcon}
-          title="My Gallery"
-          description="View and manage your saved tattoo designs"
-          onClick={() => navigate('/gallery')}
-        />
-        
-        <DashboardCard
-          icon={Calendar}
-          title="My Bookings"
-          description="View and manage your tattoo appointments"
-          onClick={() => navigate('/bookings')}
-        />
-        
-        <DashboardCard
-          icon={Settings}
-          title="Settings"
-          description="Manage your account settings and preferences"
-          onClick={() => navigate('/settings')}
-        />
+          {/* Navigation Tabs */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div className="border-b border-gray-200 dark:border-gray-700">
+              <nav className="flex overflow-x-auto">
+                {tabs.map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => setActiveTab(id)}
+                    className={`
+                      relative min-w-0 flex-1 overflow-hidden bg-white dark:bg-gray-800 py-4 px-4 text-sm font-medium text-center hover:bg-gray-50 dark:hover:bg-gray-700 focus:z-10 
+                      ${activeTab === id 
+                        ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400' 
+                        : 'text-gray-500 dark:text-gray-400 border-b-2 border-transparent'
+                      }
+                    `}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <Icon className="w-5 h-5" />
+                      <span>{label}</span>
+                    </div>
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </div>
+
+          {/* Content Area */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            {renderContent()}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
-
-interface DashboardCardProps {
-  icon: React.ElementType;
-  title: string;
-  description: string;
-  onClick: (e: React.MouseEvent) => void;
-}
-
-const DashboardCard: React.FC<DashboardCardProps> = ({
-  icon: Icon,
-  title,
-  description,
-  onClick,
-}) => (
-  <div
-    onClick={onClick}
-    className="w-full p-6 bg-white dark:bg-gray-800/50 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer group"
-  >
-    <div className="flex justify-between items-start">
-      <Icon className="text-purple-600 dark:text-purple-400" size={24} />
-      <ChevronRight className="text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors" size={20} />
-    </div>
-    <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">
-      {title}
-    </h3>
-    <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-      {description}
-    </p>
-  </div>
-);

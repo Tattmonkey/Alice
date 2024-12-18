@@ -60,6 +60,25 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => (
   </ProtectedRoute>
 );
 
+interface ArtistRouteProps {
+  children: React.ReactNode;
+}
+
+const ArtistRoute: React.FC<ArtistRouteProps> = ({ children }) => (
+  <ProtectedRoute>
+    {({ user }: { user: User }) => {
+      if (user?.role?.type !== 'artist') {
+        return (
+          <div className="text-red-500 p-4">
+            Must be an artist to access this page
+          </div>
+        );
+      }
+      return <>{children}</>;
+    }}
+  </ProtectedRoute>
+);
+
 export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSignUpModalOpen, setIsSignUpModalOpen] = useState(false);
@@ -144,17 +163,25 @@ export default function App() {
                   <Route
                     path="/artist/dashboard"
                     element={
-                      <ProtectedRoute>
+                      <ArtistRoute>
                         <ArtistDashboard />
-                      </ProtectedRoute>
+                      </ArtistRoute>
                     }
                   />
                   <Route
                     path="/artist/settings"
                     element={
-                      <ProtectedRoute>
+                      <ArtistRoute>
                         <ArtistSettings />
-                      </ProtectedRoute>
+                      </ArtistRoute>
+                    }
+                  />
+                  <Route
+                    path="/artist/setup"
+                    element={
+                      <ArtistRoute>
+                        <ArtistSettings />
+                      </ArtistRoute>
                     }
                   />
                   
