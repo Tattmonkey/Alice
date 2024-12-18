@@ -28,6 +28,9 @@ export default function UserDashboard() {
   const handleArtistConversion = async () => {
     console.log('Starting artist conversion...');
     try {
+      if (!convertToArtist) {
+        throw new Error('convertToArtist function not available');
+      }
       setIsConverting(true);
       setError(null);
       console.log('Calling convertToArtist...');
@@ -57,6 +60,11 @@ export default function UserDashboard() {
     );
   }
 
+  const handleBecomeArtist = () => {
+    console.log('Opening artist conversion modal');
+    setShowConfirmation(true);
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
@@ -68,20 +76,13 @@ export default function UserDashboard() {
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => {
-              console.log('Convert to artist clicked');
-              setShowConfirmation(true);
-            }}
             className="cursor-pointer"
           >
             <DashboardCard
               icon={Palette}
               title="Become an Artist"
               description="Convert your account to an artist account and start showcasing your work"
-              onClick={() => {
-                console.log('Convert to artist clicked (inner)');
-                setShowConfirmation(true);
-              }}
+              onClick={handleBecomeArtist}
             />
           </motion.div>
         )}
@@ -115,6 +116,7 @@ export default function UserDashboard() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            onClick={() => setShowConfirmation(false)}
           >
             <motion.div
               initial={{ scale: 0.95 }}
@@ -150,10 +152,7 @@ export default function UserDashboard() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    console.log('Confirming artist conversion');
-                    handleArtistConversion();
-                  }}
+                  onClick={handleArtistConversion}
                   disabled={isConverting}
                   className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 flex items-center"
                 >

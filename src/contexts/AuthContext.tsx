@@ -295,7 +295,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
     loading,
     error,
@@ -307,6 +307,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     convertToArtist,
     revertToUser
   };
+
+  console.log('Auth context value:', {
+    user: value.user,
+    hasConvertToArtist: !!value.convertToArtist,
+    loading: value.loading,
+    error: value.error
+  });
 
   return (
     <AuthContext.Provider value={value}>
