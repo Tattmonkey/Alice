@@ -25,7 +25,9 @@ export default function UserDashboard() {
     console.log('UserDashboard mounted, user:', user);
   }, [user]);
 
-  const handleArtistConversion = async () => {
+  const handleArtistConversion = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log('Starting artist conversion...');
     try {
       if (!convertToArtist) {
@@ -36,8 +38,8 @@ export default function UserDashboard() {
       console.log('Calling convertToArtist...');
       await convertToArtist();
       console.log('Conversion successful');
-      setShowConfirmation(false);
       showSuccessToast('Successfully converted to artist account!');
+      setShowConfirmation(false);
       setTimeout(() => {
         navigate('/artist/settings');
       }, 1000);
@@ -50,9 +52,17 @@ export default function UserDashboard() {
     }
   };
 
-  const handleOpenModal = () => {
+  const handleOpenModal = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log('Opening conversion modal');
     setShowConfirmation(true);
+  };
+
+  const handleCloseModal = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowConfirmation(false);
   };
 
   // Check if user is already an artist
@@ -113,7 +123,7 @@ export default function UserDashboard() {
       {showConfirmation && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          onClick={() => setShowConfirmation(false)}
+          onClick={handleCloseModal}
         >
           <div
             className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full"
@@ -124,7 +134,7 @@ export default function UserDashboard() {
                 Become an Artist
               </h3>
               <button
-                onClick={() => setShowConfirmation(false)}
+                onClick={handleCloseModal}
                 className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
               >
                 <X size={20} />
@@ -140,7 +150,7 @@ export default function UserDashboard() {
             </p>
             <div className="flex justify-end space-x-4">
               <button
-                onClick={() => setShowConfirmation(false)}
+                onClick={handleCloseModal}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500 dark:text-gray-300 dark:hover:text-gray-100"
               >
                 Cancel
@@ -177,7 +187,7 @@ interface DashboardCardProps {
   icon: React.ElementType;
   title: string;
   description: string;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
 }
 
 const DashboardCard: React.FC<DashboardCardProps> = ({

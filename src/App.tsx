@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { MessagingProvider } from './contexts/MessagingContext';
 import { GalleryProvider } from './contexts/GalleryContext';
@@ -89,7 +90,7 @@ export default function App() {
                 onOpenLoginModal={() => setIsLoginModalOpen(true)}
                 onOpenSignUpModal={() => setIsSignUpModalOpen(true)}
               />
-              
+              <Toaster position="top-center" />
               <main className="flex-1">
                 <Routes>
                   <Route path="/" element={<Home />} />
