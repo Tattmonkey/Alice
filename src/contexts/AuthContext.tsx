@@ -1,21 +1,27 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+
 import {
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   signInWithPopup,
-  signInWithRedirect,
   getRedirectResult,
   User as FirebaseUser,
   sendPasswordResetEmail,
   AuthError,
-  updateDoc
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+
+import { doc, getDoc } from 'firebase/firestore';
+
 import { auth, db, googleProvider } from '../config/firebase';
+
 import { showSuccessToast, showErrorToast } from '../utils/toast';
+
 import { getCurrentUser, checkUserRole } from '../utils/auth';
+
+import { updateUserDoc, setUserDoc, deleteUserDoc } from '../utils/firestore';
 
 export interface User {
   id: string;
@@ -52,7 +58,9 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,8 +80,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               displayName: firebaseUser.displayName,
               email: firebaseUser.email,
               photoURL: firebaseUser.photoURL,
-              role: userData.role || { type: 'user', verified: true, createdAt: new Date().toISOString() },
-              ...userData
+              role: userData.role || {
+                type: 'user',
+                verified: true,
+                createdAt: new Date().toISOString(),
+              },
+              ...userData,
             });
           } else {
             // Create new user document if it doesn't exist
@@ -83,11 +95,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               displayName: firebaseUser.displayName,
               email: firebaseUser.email,
               photoURL: firebaseUser.photoURL,
-              role: { type: 'user', verified: true, createdAt: new Date().toISOString() },
+              role: {
+                type: 'user',
+                verified: true,
+                createdAt: new Date().toISOString(),
+              },
               createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
+              updatedAt: new Date().toISOString(),
             };
-            await setDoc(userRef, newUser);
+            await setUserDoc(newUser);
             setUser(newUser);
           }
         } else {
@@ -132,10 +148,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setError(null);
       const result = await createUserWithEmailAndPassword(auth, email, password);
-      
-      await setDoc(doc(db, 'users', result.user.uid), {
+
+      await setUserDoc({
+        id: result.user.uid,
+        uid: result.user.uid,
         email: result.user.email,
-        role: { type: 'user', verified: true, createdAt: new Date().toISOString() },
+        role: {
+          type: 'user',
+          verified: true,
+          createdAt: new Date().toISOString(),
+        },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -171,24 +193,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const convertToArtist = async () => {
     if (!user) throw new Error('No user logged in');
-    
+
     try {
       console.log('Starting artist conversion for user:', user.uid);
       const userRef = doc(db, 'users', user.uid);
       const artistRef = doc(db, 'artists', user.uid);
-      
+
       const newRole = {
         type: 'artist',
         verified: false,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       };
 
       console.log('Updating user role:', newRole);
       // Update user role
-      await setDoc(userRef, {
+      await updateUserDoc(userRef, {
         role: newRole,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
+        updatedAt: new Date().toISOString(),
+      });
 
       console.log('Creating artist profile');
       // Create artist profile
@@ -207,16 +229,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         languages: ['English'],
         createdAt: new Date().toISOString(),
         status: 'pending',
-        verified: false
+        verified: false,
       });
 
       console.log('Updating local user state');
       // Update local user state
-      setUser(prev => {
+      setUser((prev) => {
         if (!prev) return null;
         return {
           ...prev,
-          role: newRole
+          role: newRole,
         };
       });
 
@@ -230,35 +252,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const revertToUser = async () => {
     if (!user) throw new Error('No user logged in');
-    
+
     try {
       console.log('Starting reversion to normal user for:', user.uid);
       const userRef = doc(db, 'users', user.uid);
       const artistRef = doc(db, 'artists', user.uid);
       const searchRef = doc(db, 'search_artists', user.uid);
-      
+
       // Delete artist profile
-      await deleteDoc(artistRef);
-      await deleteDoc(searchRef);
+      await deleteUserDoc(artistRef);
+      await deleteUserDoc(searchRef);
 
       // Update user role
-      await updateDoc(userRef, {
+      await updateUserDoc(userRef, {
         role: {
           type: 'user',
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         },
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       });
 
       // Update local user state
-      setUser(prev => {
+      setUser((prev) => {
         if (!prev) return null;
         return {
           ...prev,
           role: {
             type: 'user',
-            updatedAt: new Date().toISOString()
-          }
+            updatedAt: new Date().toISOString(),
+          },
         };
       });
 
@@ -280,7 +302,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logout,
     resetPassword,
     convertToArtist,
-    revertToUser
+    revertToUser,
   };
 
   console.log('Auth context value:', {
@@ -288,7 +310,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hasConvertToArtist: !!value.convertToArtist,
     loading: value.loading,
     error: value.error,
-    userRole: value.user?.role?.type
+    userRole: value.user?.role?.type,
   });
 
   return (
