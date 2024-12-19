@@ -1,96 +1,108 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Calendar, Users, Star, DollarSign, Clock, Settings, Image, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import BookingList from './BookingList';
-import ArtistSettings from './ArtistSettings';
-import ArtistStats from './ArtistStats';
-import UserGallery from '../user/UserGallery';
-import UserMessages from '../user/UserMessages';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import { ArtistProfile } from '../../types/artist';
+import { toast } from 'react-toastify';
+import ArtistPortfolio from './ArtistPortfolio';
+import ArtistBookings from './ArtistBookings';
+import ArtistProfileComponent from './ArtistProfile';
+import ArtistAvailability from './ArtistAvailability';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Card } from '../ui/card';
+import { Loader2 } from 'lucide-react';
 
-export default function ArtistDashboard() {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'bookings' | 'stats' | 'gallery' | 'messages' | 'settings'>('bookings');
+const ArtistDashboard: React.FC = () => {
+  const { currentUser } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [artistProfile, setArtistProfile] = useState<ArtistProfile | null>(null);
+  const [activeTab, setActiveTab] = useState('profile');
 
-  if (!user) {
+  useEffect(() => {
+    const fetchArtistProfile = async () => {
+      if (!currentUser) return;
+
+      try {
+        const artistDoc = await getDoc(doc(db, 'artists', currentUser.uid));
+        if (artistDoc.exists()) {
+          setArtistProfile({ id: artistDoc.id, ...artistDoc.data() } as ArtistProfile);
+        } else {
+          toast.error('Artist profile not found');
+        }
+      } catch (error) {
+        console.error('Error fetching artist profile:', error);
+        toast.error('Failed to load artist profile');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchArtistProfile();
+  }, [currentUser]);
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600 dark:text-gray-300">Please sign in to view your dashboard</p>
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'bookings':
-        return <BookingList />;
-      case 'stats':
-        return <ArtistStats />;
-      case 'gallery':
-        return <UserGallery />;
-      case 'messages':
-        return <UserMessages />;
-      case 'settings':
-        return <ArtistSettings />;
-      default:
-        return null;
-    }
-  };
-
-  const tabs = [
-    { id: 'bookings', label: 'Bookings', icon: Calendar },
-    { id: 'stats', label: 'Stats', icon: Star },
-    { id: 'gallery', label: 'Gallery', icon: Image },
-    { id: 'messages', label: 'Messages', icon: MessageSquare },
-    { id: 'settings', label: 'Settings', icon: Settings },
-  ] as const;
+  if (!artistProfile) {
+    return (
+      <div className="p-4">
+        <Card className="p-6">
+          <h2 className="text-2xl font-bold mb-4">Welcome to Artist Dashboard</h2>
+          <p className="text-gray-600">
+            Please complete your artist profile to get started.
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex flex-col gap-8">
-          {/* Welcome Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Welcome back, {user.displayName || 'Artist'}!
-            </h1>
-            <p className="text-gray-600 dark:text-gray-300">
-              Manage your bookings, update your gallery, and connect with clients all in one place.
-            </p>
-          </div>
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-6">Artist Dashboard</h1>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid grid-cols-4 gap-4 mb-6">
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+          <TabsTrigger value="bookings">Bookings</TabsTrigger>
+          <TabsTrigger value="availability">Availability</TabsTrigger>
+        </TabsList>
 
-          {/* Navigation Tabs */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-            <div className="border-b border-gray-200 dark:border-gray-700">
-              <nav className="flex overflow-x-auto">
-                {tabs.map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    onClick={() => setActiveTab(id)}
-                    className={`
-                      relative min-w-0 flex-1 overflow-hidden bg-white dark:bg-gray-800 py-4 px-4 text-sm font-medium text-center hover:bg-gray-50 dark:hover:bg-gray-700 focus:z-10 
-                      ${activeTab === id 
-                        ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400' 
-                        : 'text-gray-500 dark:text-gray-400 border-b-2 border-transparent'
-                      }
-                    `}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      <Icon className="w-5 h-5" />
-                      <span>{label}</span>
-                    </div>
-                  </button>
-                ))}
-              </nav>
-            </div>
-          </div>
+        <TabsContent value="profile">
+          <ArtistProfileComponent profile={artistProfile} onUpdate={setArtistProfile} />
+        </TabsContent>
 
-          {/* Content Area */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            {renderContent()}
-          </div>
-        </div>
-      </div>
+        <TabsContent value="portfolio">
+          <ArtistPortfolio 
+            portfolio={artistProfile.portfolio} 
+            artistId={artistProfile.id} 
+            onUpdate={(portfolio) => 
+              setArtistProfile(prev => prev ? { ...prev, portfolio } : null)
+            } 
+          />
+        </TabsContent>
+
+        <TabsContent value="bookings">
+          <ArtistBookings artistId={artistProfile.id} />
+        </TabsContent>
+
+        <TabsContent value="availability">
+          <ArtistAvailability 
+            availability={artistProfile.availability}
+            artistId={artistProfile.id}
+            onUpdate={(availability) => 
+              setArtistProfile(prev => prev ? { ...prev, availability } : null)
+            }
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
-}
+};
+
+export default ArtistDashboard;

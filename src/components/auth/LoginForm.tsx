@@ -1,66 +1,134 @@
-import React, { useState, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { motion } from 'framer-motion';
-import { Mail, Lock, LogIn, Loader2, AlertTriangle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
-
-const schema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters')
-});
-
-type FormData = z.infer<typeof schema>;
+import { toast } from 'react-toastify';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Card } from '../ui/card';
+import { FcGoogle } from 'react-icons/fc';
 
 export default function LoginForm() {
-  const { signIn, signInWithGoogle } = useAuth();
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
-    resolver: zodResolver(schema)
-  });
+  const navigate = useNavigate();
+  const { login, loginWithGoogle } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const onSubmit = async (data: FormData) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
     try {
-      await signIn(data.email, data.password);
+      await login(email, password);
+      navigate('/dashboard');
     } catch (error) {
-      console.error(error);
+      console.error('Login error:', error);
+      toast.error('Failed to log in');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleGoogleSignIn = useCallback(async () => {
-    if (googleLoading) return;
-
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
     try {
-      setGoogleLoading(true);
-      await signInWithGoogle();
-      toast.success('Successfully signed in with Google');
-    } catch (error: any) {
-      console.error('Google sign in error:', error);
-      if (error.code === 'auth/popup-blocked') {
-        toast.error(
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
-              <span>Popup was blocked</span>
-            </div>
-            <p className="text-sm">Please allow popups for this site and try again.</p>
-          </div>,
-          { duration: 5000 }
-        );
-      } else if (error.code !== 'auth/popup-closed-by-user') {
-        toast.error('Failed to sign in with Google');
-      }
+      await loginWithGoogle();
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      toast.error('Failed to sign in with Google');
     } finally {
-      setGoogleLoading(false);
+      setLoading(false);
     }
-  }, [googleLoading, signInWithGoogle]);
+  };
 
   return (
-    <div className="max-w-md w-full space-y-8">
-      {/* Rest of the component remains the same */}
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <Card className="w-full max-w-md space-y-8 p-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+            Sign in to your account
+          </h2>
+        </div>
+
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="email" className="sr-only">
+                Email address
+              </label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email address"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="sr-only">
+                Password
+              </label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading}
+            >
+              Sign in
+            </Button>
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="bg-white px-2 text-gray-500">Or continue with</span>
+            </div>
+          </div>
+
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+            >
+              <FcGoogle className="mr-2 h-5 w-5" />
+              Sign in with Google
+            </Button>
+          </div>
+        </form>
+
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => navigate('/signup')}
+            className="text-sm text-blue-600 hover:text-blue-500"
+          >
+            Don't have an account? Sign up
+          </button>
+        </div>
+      </Card>
     </div>
   );
 }

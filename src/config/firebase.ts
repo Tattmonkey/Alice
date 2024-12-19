@@ -4,68 +4,31 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 
-// Your Firebase configuration
+// Firebase configuration
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: "AIzaSyAI1MQwk9_y_oBOkQB6dsiZbTIDMpjNWd8",
+  authDomain: "alice-tattoos.firebaseapp.com",
+  projectId: "alice-tattoos",
+  storageBucket: "alice-tattoos.appspot.com",
+  messagingSenderId: "489403546949",
+  appId: "1:489403546949:web:800d27740abf66c737922c",
+  measurementId: "G-C6GVG0PJCR"
 };
 
 // Initialize Firebase
-let app;
-try {
-  app = initializeApp(firebaseConfig);
-  console.log('Firebase initialized successfully');
-} catch (error) {
-  console.error('Error initializing Firebase:', error);
-  throw error;
-}
+const app = initializeApp(firebaseConfig);
 
 // Initialize services
-let auth;
-try {
-  auth = getAuth(app);
-  console.log('Firebase Auth initialized');
-} catch (error) {
-  console.error('Error initializing Auth:', error);
-  throw error;
-}
-
-let db;
-try {
-  db = getFirestore(app);
-  console.log('Firestore initialized');
-} catch (error) {
-  console.error('Error initializing Firestore:', error);
-  throw error;
-}
-
-let storage;
-try {
-  storage = getStorage(app);
-  console.log('Storage initialized');
-} catch (error) {
-  console.error('Error initializing Storage:', error);
-  throw error;
-}
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
 
 // Initialize Analytics conditionally
 let analytics = null;
 isSupported()
-  .then(yes => {
-    if (yes) {
-      analytics = getAnalytics(app);
-      console.log('Analytics initialized');
-    } else {
-      console.log('Analytics not supported in this environment');
-    }
-  })
+  .then(yes => yes && getAnalytics(app))
   .catch(error => {
-    console.error('Error checking analytics support:', error);
+    console.error('Analytics error:', error);
   });
 
 // Set persistence to LOCAL
@@ -77,18 +40,10 @@ setPersistence(auth, browserLocalPersistence)
     console.error('Error setting auth persistence:', error);
   });
 
-// Export initialized services
-export { app, auth, db, storage, analytics, GoogleAuthProvider };
-
-// Export GoogleAuthProvider class for consistent configuration
-export const googleProvider = new GoogleAuthProvider();
+// Initialize Google Auth Provider
+const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
-  prompt: 'select_account',
-  access_type: 'offline',
-  include_granted_scopes: 'true',
-  // Add additional OAuth 2.0 scopes if needed
-  scope: [
-    'https://www.googleapis.com/auth/userinfo.email',
-    'https://www.googleapis.com/auth/userinfo.profile'
-  ].join(' ')
+  prompt: 'select_account'
 });
+
+export { app, auth, db, storage, analytics, googleProvider };
