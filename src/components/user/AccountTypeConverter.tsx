@@ -6,21 +6,17 @@ import { showSuccessToast, showErrorToast } from '../../utils/toast';
 import { useNavigate } from 'react-router-dom';
 
 export default function AccountTypeConverter() {
-  const { user, convertToArtist, revertToUser } = useAuth();
-  const [openDialog, setOpenDialog] = useState(false);
+  const auth = useAuth();
+  if (!auth) {
+    return null; // Return early if not within AuthProvider
+  }
+  
+  const { user, convertToArtist, revertToUser } = auth;
   const [isConverting, setIsConverting] = useState(false);
   const navigate = useNavigate();
 
-  console.log('AccountTypeConverter:', {
-    user,
-    hasConvertToArtist: !!convertToArtist,
-    hasRevertToUser: !!revertToUser,
-    userRole: user?.role?.type
-  });
-
   const handleConvertToArtist = async () => {
     if (!user || !convertToArtist) {
-      console.error('No user or convertToArtist function');
       showErrorToast('Unable to convert account at this time');
       return;
     }
@@ -29,7 +25,7 @@ export default function AccountTypeConverter() {
     try {
       await convertToArtist();
       showSuccessToast('Successfully converted to artist account!');
-      navigate('/artist/setup');
+      navigate('/dashboard'); // Navigate to dashboard instead of artist setup
     } catch (error) {
       console.error('Error converting to artist:', error);
       showErrorToast('Failed to convert to artist account');
@@ -40,16 +36,14 @@ export default function AccountTypeConverter() {
 
   const handleRevertToUser = async () => {
     if (!user || !revertToUser) {
-      console.error('No user or revertToUser function');
       showErrorToast('Unable to revert account at this time');
       return;
     }
-    
-    setOpenDialog(false);
+
     setIsConverting(true);
     try {
       await revertToUser();
-      showSuccessToast('Successfully reverted to user account');
+      showSuccessToast('Successfully reverted to user account!');
       navigate('/dashboard');
     } catch (error) {
       console.error('Error reverting to user:', error);
@@ -59,95 +53,42 @@ export default function AccountTypeConverter() {
     }
   };
 
-  if (!user) {
-    console.log('No user found');
-    return null;
-  }
+  const isArtist = user?.role?.type === 'artist';
 
   return (
-    <div className="account-type-converter">
-      {user.role?.type !== 'artist' ? (
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="w-full px-4 py-2 text-white bg-purple-600 rounded-lg shadow hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
-          onClick={handleConvertToArtist}
-          disabled={isConverting || !convertToArtist}
-        >
-          {isConverting ? (
-            <>
-              <Loader className="w-4 h-4 animate-spin" />
-              <span>Converting...</span>
-            </>
-          ) : (
-            'Convert to Artist Account'
-          )}
-        </motion.button>
-      ) : (
-        <div>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="w-full px-4 py-2 text-white bg-red-500 rounded-lg shadow hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
-            onClick={() => setOpenDialog(true)}
-            disabled={isConverting || !revertToUser}
-          >
-            {isConverting ? (
-              <>
-                <Loader className="w-4 h-4 animate-spin" />
-                <span>Reverting...</span>
-              </>
-            ) : (
-              'Revert to Normal User'
-            )}
-          </motion.button>
-
-          {openDialog && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full"
-              >
-                <div className="flex items-center gap-2 text-red-500 mb-4">
-                  <AlertCircle className="w-6 h-6" />
-                  <h3 className="text-lg font-semibold">Warning: Account Conversion</h3>
-                </div>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">
-                  Are you sure you want to revert to a normal user account? This will:
-                  <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>Remove your artist profile</li>
-                    <li>Hide your portfolio</li>
-                    <li>Cancel any pending bookings</li>
-                  </ul>
-                </p>
-                <div className="flex justify-end gap-4">
-                  <button
-                    onClick={() => setOpenDialog(false)}
-                    className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleRevertToUser}
-                    disabled={isConverting}
-                    className="px-4 py-2 text-white bg-red-500 rounded-md hover:bg-red-600 transition-colors flex items-center gap-2"
-                  >
-                    {isConverting ? (
-                      <>
-                        <Loader className="w-4 h-4 animate-spin" />
-                        <span>Reverting...</span>
-                      </>
-                    ) : (
-                      'Confirm Revert'
-                    )}
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
+    <div className="p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6"
+      >
+        <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-white">
+          Account Type
+        </h2>
+        
+        <div className="mb-6">
+          <p className="text-gray-600 dark:text-gray-300">
+            {isArtist
+              ? "You're currently an artist. You can revert to a regular user account if you wish."
+              : "Want to showcase your art? Convert your account to an artist account!"}
+          </p>
         </div>
-      )}
+
+        {isConverting ? (
+          <div className="flex items-center justify-center p-4">
+            <Loader className="animate-spin mr-2" />
+            <span>Processing...</span>
+          </div>
+        ) : (
+          <button
+            onClick={isArtist ? handleRevertToUser : handleConvertToArtist}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+            disabled={isConverting}
+          >
+            {isArtist ? 'Revert to User Account' : 'Convert to Artist Account'}
+          </button>
+        )}
+      </motion.div>
     </div>
   );
 }

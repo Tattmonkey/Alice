@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Image, MessageSquare, Settings, Brush } from 'lucide-react';
+import { Calendar, Image, MessageSquare, Settings, Brush, Palette } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import UserGallery from './user/UserGallery';
 import UserMessages from './user/UserMessages';
 import UserBookings from './user/UserBookings';
 import UserSettings from './UserSettings';
-import AccountTypeConverter from './user/AccountTypeConverter';
+import ArtistGallery from './artists/ArtistGallery';
+import ArtistBookings from './artists/ArtistBookings';
 
 export default function UserDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'bookings' | 'gallery' | 'messages' | 'settings'>('bookings');
+  const [activeTab, setActiveTab] = useState<'bookings' | 'gallery' | 'messages' | 'settings' | 'artistGallery' | 'artistBookings'>('bookings');
 
   if (!user) {
     return (
@@ -21,6 +22,8 @@ export default function UserDashboard() {
       </div>
     );
   }
+
+  const isArtist = user.role?.type === 'artist';
 
   const renderContent = () => {
     switch (activeTab) {
@@ -32,6 +35,10 @@ export default function UserDashboard() {
         return <UserMessages />;
       case 'settings':
         return <UserSettings />;
+      case 'artistGallery':
+        return <ArtistGallery />;
+      case 'artistBookings':
+        return <ArtistBookings />;
       default:
         return null;
     }
@@ -41,8 +48,16 @@ export default function UserDashboard() {
     { id: 'bookings', label: 'My Bookings', icon: Calendar },
     { id: 'gallery', label: 'My Gallery', icon: Image },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
-    { id: 'settings', label: 'Settings', icon: Settings },
-  ] as const;
+    { id: 'settings', label: 'Settings', icon: Settings }
+  ];
+
+  // Add artist-specific tabs if user is an artist
+  if (isArtist) {
+    tabs.push(
+      { id: 'artistGallery', label: 'Artist Gallery', icon: Palette },
+      { id: 'artistBookings', label: 'Artist Bookings', icon: Brush }
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
