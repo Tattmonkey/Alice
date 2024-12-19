@@ -6,12 +6,9 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
-  signInWithPopup,
-  signInWithRedirect,
-  GoogleAuthProvider
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, googleProvider } from '../config/firebase';
+import { auth, db } from '../config/firebase';
 
 export interface User extends FirebaseUser {
   role?: {
@@ -29,7 +26,6 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserRole: (userId: string, role: User['role']) => Promise<void>;
@@ -93,6 +89,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: new Date().toISOString()
         });
       }
+
+      // Force refresh the token to ensure we have the latest claims
+      await result.user.getIdToken(true);
+      
     } catch (error: any) {
       console.error('Login error:', error);
       throw new Error(getErrorMessage(error.code));
@@ -114,43 +114,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (error: any) {
       console.error('Signup error:', error);
-      throw new Error(getErrorMessage(error.code));
-    }
-  };
-
-  const loginWithGoogle = async () => {
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
-      
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, 'users', result.user.uid), {
-          email: result.user.email,
-          displayName: result.user.displayName,
-          photoURL: result.user.photoURL,
-          role: {
-            type: 'user',
-            verified: false,
-            createdAt: new Date().toISOString()
-          },
-          createdAt: new Date().toISOString()
-        });
-      }
-
-      // Force refresh the token to ensure we have the latest claims
-      await result.user.getIdToken(true);
-      
-    } catch (error: any) {
-      console.error('Google sign-in error:', error);
-      if (error.code === 'auth/popup-blocked') {
-        // If popup is blocked, try redirect method instead
-        try {
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        } catch (redirectError: any) {
-          throw new Error(getErrorMessage(redirectError.code));
-        }
-      }
       throw new Error(getErrorMessage(error.code));
     }
   };
@@ -196,12 +159,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return 'Password is too weak';
       case 'auth/invalid-email':
         return 'Invalid email address';
-      case 'auth/popup-closed-by-user':
-        return 'Sign-in window was closed';
-      case 'auth/popup-blocked':
-        return 'Sign-in popup was blocked by your browser';
-      case 'auth/cancelled-popup-request':
-        return 'Sign-in was cancelled';
       case 'auth/network-request-failed':
         return 'Network error. Please check your connection';
       case 'auth/too-many-requests':
@@ -216,7 +173,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     login,
     signup,
-    loginWithGoogle,
     logout,
     resetPassword,
     updateUserRole

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { auth } from '../../config/firebase';
+import { auth, signInWithGoogle } from '../../config/firebase';
 import { getRedirectResult } from 'firebase/auth';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -11,7 +11,7 @@ import { Loader2 } from 'lucide-react';
 
 const LoginForm = () => {
   const navigate = useNavigate();
-  const { login, loginWithGoogle } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,16 +19,20 @@ const LoginForm = () => {
 
   useEffect(() => {
     // Check for redirect result when component mounts
-    getRedirectResult(auth)
-      .then((result) => {
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
         if (result) {
+          console.log('Redirect successful:', result.user.email);
           navigate('/dashboard');
         }
-      })
-      .catch((error) => {
+      } catch (error: any) {
         console.error('Redirect error:', error);
         setError(error?.message || 'Failed to sign in with Google');
-      });
+      }
+    };
+
+    checkRedirect();
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,8 +60,11 @@ const LoginForm = () => {
     setError('');
     
     try {
-      await loginWithGoogle();
-      // Don't navigate here - we'll handle navigation after redirect
+      const result = await signInWithGoogle();
+      if (result) { // If we got a result (not redirect)
+        navigate('/dashboard');
+      }
+      // If no result, we're doing redirect and page will reload
     } catch (error: any) {
       console.error('Google sign-in error:', error);
       setError(error?.message || 'Failed to sign in with Google');
