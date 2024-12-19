@@ -6,13 +6,13 @@ import { getAnalytics, isSupported } from 'firebase/analytics';
 
 // Your Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyAI1MQwk9_y_oBOkQB6dsiZbTIDMpjNWd8",
-  authDomain: "alice-tattoos.firebaseapp.com",
-  projectId: "alice-tattoos",
-  storageBucket: "alice-tattoos.appspot.com", // Fixed storage bucket format
-  messagingSenderId: "489403546949",
-  appId: "1:489403546949:web:800d27740abf66c737922c",
-  measurementId: "G-C6GVG0PJCR"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
@@ -23,17 +23,19 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
+// Initialize Analytics conditionally
+let analytics = null;
+isSupported().then(yes => yes && (analytics = getAnalytics(app)))
+  .catch(e => console.log('Analytics not supported:', e));
+
 // Set persistence to LOCAL
 setPersistence(auth, browserLocalPersistence)
   .catch((error) => {
     console.error('[Firebase] Persistence error:', error);
   });
 
-// Initialize Analytics conditionally
-isSupported().then(yes => yes ? getAnalytics(app) : null);
-
 // Export initialized services
-export { app, auth, db, storage };
+export { app, auth, db, storage, analytics, GoogleAuthProvider };
 
 // Export GoogleAuthProvider class for consistent configuration
 export const googleProvider = new GoogleAuthProvider();

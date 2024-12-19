@@ -1,51 +1,21 @@
-import React from 'react';
-import { createContext, useContext, useState, useEffect } from 'react';
-
-import {
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { 
+  User as FirebaseUser,
+  onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
-  signInWithPopup,
-  getRedirectResult,
-  User as FirebaseUser,
-  sendPasswordResetEmail,
-  AuthError,
+  sendPasswordResetEmail
 } from 'firebase/auth';
+import { auth } from '../config/firebase';
 
-import { doc, getDoc } from 'firebase/firestore';
-
-import { auth, db, googleProvider } from '../config/firebase';
-
-import { showSuccessToast, showErrorToast } from '../utils/toast';
-
-import { getCurrentUser, checkUserRole } from '../utils/auth';
-
-import { updateUserDoc, setUserDoc, deleteUserDoc } from '../utils/firestore';
-
-export interface User {
-  id: string;
-  uid: string;
-  displayName: string | null;
-  email: string | null;
-  photoURL: string | null;
-  name?: string;
-  role?: { type: string; verified: boolean; createdAt: string };
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface AuthContextType {
-  user: User | null;
+interface AuthContextType {
+  currentUser: FirebaseUser | null;
   loading: boolean;
-  error: string | null;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  convertToArtist: () => Promise<void>;
-  revertToUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -58,260 +28,63 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        if (firebaseUser) {
-          const userRef = doc(db, 'users', firebaseUser.uid);
-          const userDoc = await getDoc(userRef);
-
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setUser({
-              id: firebaseUser.uid,
-              uid: firebaseUser.uid,
-              displayName: firebaseUser.displayName,
-              email: firebaseUser.email,
-              photoURL: firebaseUser.photoURL,
-              role: userData.role || {
-                type: 'user',
-                verified: true,
-                createdAt: new Date().toISOString(),
-              },
-              ...userData,
-            });
-          } else {
-            // Create new user document if it doesn't exist
-            const newUser = {
-              id: firebaseUser.uid,
-              uid: firebaseUser.uid,
-              displayName: firebaseUser.displayName,
-              email: firebaseUser.email,
-              photoURL: firebaseUser.photoURL,
-              role: {
-                type: 'user',
-                verified: true,
-                createdAt: new Date().toISOString(),
-              },
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            await setUserDoc(newUser);
-            setUser(newUser);
-          }
-        } else {
-          setUser(null);
-        }
-      } catch (err) {
-        console.error('Error fetching user data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch user data');
-      } finally {
-        setLoading(false);
-      }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return unsubscribe;
   }, []);
 
-  const signInWithGoogle = async () => {
+  const login = async (email: string, password: string) => {
     try {
-      console.log('[Auth] Initiating Google sign-in...');
-      setError(null);
-      await signInWithPopup(auth, googleProvider);
-      showSuccessToast('Successfully signed in with Google!');
+      await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
-      console.error('[Auth] Google sign-in error:', error);
-      showErrorToast('Failed to sign in with Google');
+      console.error('Login error:', error);
       throw error;
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signup = async (email: string, password: string) => {
     try {
-      setError(null);
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (err) {
-      console.error('Error signing in:', err);
-      setError(err instanceof Error ? err.message : 'Failed to sign in');
-      throw err;
-    }
-  };
-
-  const signUp = async (email: string, password: string) => {
-    try {
-      setError(null);
-      const result = await createUserWithEmailAndPassword(auth, email, password);
-
-      await setUserDoc({
-        id: result.user.uid,
-        uid: result.user.uid,
-        email: result.user.email,
-        role: {
-          type: 'user',
-          verified: true,
-          createdAt: new Date().toISOString(),
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.error('Error signing up:', err);
-      setError(err instanceof Error ? err.message : 'Failed to sign up');
-      throw err;
+      await createUserWithEmailAndPassword(auth, email, password);
+    } catch (error) {
+      console.error('Signup error:', error);
+      throw error;
     }
   };
 
   const logout = async () => {
     try {
-      setError(null);
       await signOut(auth);
-      setUser(null);
-    } catch (err) {
-      console.error('Error signing out:', err);
-      setError(err instanceof Error ? err.message : 'Failed to sign out');
-      throw err;
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
     }
   };
 
   const resetPassword = async (email: string) => {
     try {
-      setError(null);
       await sendPasswordResetEmail(auth, email);
-    } catch (err) {
-      console.error('Error resetting password:', err);
-      setError(err instanceof Error ? err.message : 'Failed to reset password');
-      throw err;
-    }
-  };
-
-  const convertToArtist = async () => {
-    if (!user) throw new Error('No user logged in');
-
-    try {
-      console.log('Starting artist conversion for user:', user.uid);
-      const userRef = doc(db, 'users', user.uid);
-      const artistRef = doc(db, 'artists', user.uid);
-
-      const newRole = {
-        type: 'artist',
-        verified: false,
-        createdAt: new Date().toISOString(),
-      };
-
-      console.log('Updating user role:', newRole);
-      // Update user role
-      await updateUserDoc(userRef, {
-        role: newRole,
-        updatedAt: new Date().toISOString(),
-      });
-
-      console.log('Creating artist profile');
-      // Create artist profile
-      await setDoc(artistRef, {
-        userId: user.uid,
-        displayName: user.displayName || '',
-        email: user.email || '',
-        photoURL: user.photoURL || '',
-        bio: '',
-        location: '',
-        specialties: [],
-        experience: '',
-        socialLinks: {},
-        hourlyRate: '',
-        availability: '',
-        languages: ['English'],
-        createdAt: new Date().toISOString(),
-        status: 'pending',
-        verified: false,
-      });
-
-      console.log('Updating local user state');
-      // Update local user state
-      setUser((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          role: newRole,
-        };
-      });
-
-      showSuccessToast('Successfully converted to artist account');
     } catch (error) {
-      console.error('Error converting to artist:', error);
-      showErrorToast('Failed to convert account');
-      throw error;
-    }
-  };
-
-  const revertToUser = async () => {
-    if (!user) throw new Error('No user logged in');
-
-    try {
-      console.log('Starting reversion to normal user for:', user.uid);
-      const userRef = doc(db, 'users', user.uid);
-      const artistRef = doc(db, 'artists', user.uid);
-      const searchRef = doc(db, 'search_artists', user.uid);
-
-      // Delete artist profile
-      await deleteUserDoc(artistRef);
-      await deleteUserDoc(searchRef);
-
-      // Update user role
-      await updateUserDoc(userRef, {
-        role: {
-          type: 'user',
-          updatedAt: new Date().toISOString(),
-        },
-        updatedAt: new Date().toISOString(),
-      });
-
-      // Update local user state
-      setUser((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          role: {
-            type: 'user',
-            updatedAt: new Date().toISOString(),
-          },
-        };
-      });
-
-      showSuccessToast('Successfully reverted to normal user account');
-    } catch (error) {
-      console.error('Error reverting to user:', error);
-      showErrorToast('Failed to revert account');
+      console.error('Reset password error:', error);
       throw error;
     }
   };
 
   const value = {
-    user,
+    currentUser,
     loading,
-    error,
-    signIn,
-    signUp,
-    signInWithGoogle,
+    login,
+    signup,
     logout,
-    resetPassword,
-    convertToArtist,
-    revertToUser,
+    resetPassword
   };
-
-  console.log('Auth context value:', {
-    user: value.user,
-    hasConvertToArtist: !!value.convertToArtist,
-    loading: value.loading,
-    error: value.error,
-    userRole: value.user?.role?.type,
-  });
 
   return (
     <AuthContext.Provider value={value}>
@@ -319,3 +92,5 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     </AuthContext.Provider>
   );
 };
+
+export default AuthContext;
