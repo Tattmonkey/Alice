@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Image, MessageSquare, Settings, Brush, Palette } from 'lucide-react';
+import { Calendar, Image, MessageSquare, Settings, Brush, Palette, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import UserGallery from './user/UserGallery';
@@ -9,8 +9,9 @@ import UserBookings from './user/UserBookings';
 import UserSettings from './UserSettings';
 import ArtistGallery from './artists/ArtistGallery';
 import ArtistBookings from './artists/ArtistBookings';
+import ArtistProfile from './artists/ArtistProfile';
 
-type TabType = 'bookings' | 'gallery' | 'messages' | 'settings' | 'artistGallery' | 'artistBookings';
+type TabType = 'bookings' | 'gallery' | 'messages' | 'settings' | 'artistGallery' | 'artistBookings' | 'artistProfile';
 
 export default function UserDashboard() {
   const { user } = useAuth();
@@ -41,6 +42,8 @@ export default function UserDashboard() {
         return <ArtistGallery />;
       case 'artistBookings':
         return <ArtistBookings />;
+      case 'artistProfile':
+        return <ArtistProfile />;
       default:
         return null;
     }
@@ -56,6 +59,7 @@ export default function UserDashboard() {
   // Add artist-specific tabs if user is an artist
   if (isArtist) {
     tabs.push(
+      { id: 'artistProfile' as TabType, label: 'Artist Profile', icon: User },
       { id: 'artistGallery' as TabType, label: 'Artist Gallery', icon: Palette },
       { id: 'artistBookings' as TabType, label: 'Artist Bookings', icon: Brush }
     );
