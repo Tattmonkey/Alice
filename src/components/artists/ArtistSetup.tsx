@@ -4,9 +4,9 @@ import { motion } from 'framer-motion';
 import { Upload, MapPin, Link as LinkIcon, Save, Instagram, Facebook, Twitter } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { storage, db } from '../../config/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import { showSuccessToast, showErrorToast } from '../../utils/toast';
+import { uploadImage } from '../../utils/firebase';
 
 interface SocialLinks {
   instagram?: string;
@@ -104,26 +104,16 @@ export default function ArtistSetup() {
     setUploading(true);
 
     try {
-      // Create a unique filename
-      const timestamp = new Date().getTime();
-      const filename = `${timestamp}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      const storageRef = ref(storage, `artists/${user.uid}/${type}/${filename}`);
+      // Upload image and get URL
+      const downloadURL = await uploadImage(file, `artists/${user.uid}/${type}`);
       
-      // Upload the file
-      const snapshot = await uploadBytes(storageRef, file);
-      console.log('Uploaded image successfully:', snapshot);
-      
-      // Get the download URL
-      const downloadURL = await getDownloadURL(storageRef);
-      console.log('Got download URL:', downloadURL);
-
-      // Update the profile state
+      // Update profile state with new image URL
       setProfile(prev => ({
         ...prev,
         [type === 'profile' ? 'profileImage' : 'coverImage']: downloadURL,
       }));
 
-      // If it's a profile image, also update the user's photoURL in Firebase Auth
+      // If it's a profile image, update user's photoURL
       if (type === 'profile') {
         const userRef = doc(db, 'users', user.uid);
         await updateDoc(userRef, {
@@ -146,17 +136,23 @@ export default function ArtistSetup() {
     setLoading(true);
 
     try {
-      // Update artist profile
-      const artistRef = doc(db, 'artists', user.uid);
+      // Validate required fields
+      if (!profile.displayName.trim()) {
+        throw new Error('Display name is required');
+      }
+
+      // Prepare artist data
       const artistData = {
         ...profile,
         userId: user.uid,
         email: user.email || '',
         updatedAt: new Date().toISOString(),
       };
-      
-      console.log('Saving artist profile:', artistData);
+
+      // Update artist profile
+      const artistRef = doc(db, 'artists', user.uid);
       await setDoc(artistRef, artistData, { merge: true });
+      console.log('Saved artist profile:', artistData);
 
       // Update user profile
       const userRef = doc(db, 'users', user.uid);
@@ -170,10 +166,11 @@ export default function ArtistSetup() {
         },
         updatedAt: new Date().toISOString(),
       });
+      console.log('Updated user profile');
 
       // Update search index
       const searchRef = doc(db, 'search_artists', user.uid);
-      await setDoc(searchRef, {
+      const searchData = {
         userId: user.uid,
         displayName: profile.displayName,
         location: profile.location,
@@ -186,13 +183,15 @@ export default function ArtistSetup() {
         availability: profile.availability,
         languages: profile.languages,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      await setDoc(searchRef, searchData);
+      console.log('Updated search index');
 
       showSuccessToast('Profile saved successfully');
       navigate('/artist/dashboard');
     } catch (error) {
       console.error('Error saving profile:', error);
-      showErrorToast('Failed to save profile');
+      showErrorToast(error instanceof Error ? error.message : 'Failed to save profile');
     } finally {
       setLoading(false);
     }

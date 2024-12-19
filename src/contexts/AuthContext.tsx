@@ -9,7 +9,8 @@ import {
   getRedirectResult,
   User as FirebaseUser,
   sendPasswordResetEmail,
-  AuthError
+  AuthError,
+  updateDoc
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../config/firebase';
@@ -231,34 +232,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) throw new Error('No user logged in');
     
     try {
+      console.log('Starting reversion to normal user for:', user.uid);
       const userRef = doc(db, 'users', user.uid);
       const artistRef = doc(db, 'artists', user.uid);
+      const searchRef = doc(db, 'search_artists', user.uid);
       
-      const newRole = {
-        type: 'user',
-        verified: true,
-        createdAt: new Date().toISOString()
-      };
-
-      // Update user role
-      await setDoc(userRef, {
-        role: newRole,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-
       // Delete artist profile
       await deleteDoc(artistRef);
+      await deleteDoc(searchRef);
+
+      // Update user role
+      await updateDoc(userRef, {
+        role: {
+          type: 'user',
+          updatedAt: new Date().toISOString()
+        },
+        updatedAt: new Date().toISOString()
+      });
 
       // Update local user state
       setUser(prev => {
         if (!prev) return null;
         return {
           ...prev,
-          role: newRole
+          role: {
+            type: 'user',
+            updatedAt: new Date().toISOString()
+          }
         };
       });
 
-      showSuccessToast('Successfully reverted to user account');
+      showSuccessToast('Successfully reverted to normal user account');
     } catch (error) {
       console.error('Error reverting to user:', error);
       showErrorToast('Failed to revert account');
