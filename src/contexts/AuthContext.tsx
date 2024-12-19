@@ -7,11 +7,11 @@ import {
   signOut,
   sendPasswordResetEmail,
   signInWithPopup,
+  signInWithRedirect,
   GoogleAuthProvider
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
-import { toast } from 'react-toastify';
+import { auth, db, googleProvider } from '../config/firebase';
 
 export interface User extends FirebaseUser {
   role?: {
@@ -66,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } as User);
         } catch (error) {
           console.error('Error fetching user data:', error);
-          toast.error('Error loading user data');
+          setCurrentUser(null);
         }
       } else {
         setCurrentUser(null);
@@ -79,12 +79,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast.success('Successfully logged in!');
-    } catch (error) {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
+      
+      if (!userDoc.exists()) {
+        await setDoc(doc(db, 'users', result.user.uid), {
+          email: result.user.email,
+          role: {
+            type: 'user',
+            verified: false,
+            createdAt: new Date().toISOString()
+          },
+          createdAt: new Date().toISOString()
+        });
+      }
+    } catch (error: any) {
       console.error('Login error:', error);
-      toast.error('Failed to log in');
-      throw error;
+      throw new Error(getErrorMessage(error.code));
     }
   };
 
@@ -92,7 +103,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Create user document
       await setDoc(doc(db, 'users', result.user.uid), {
         email: result.user.email,
         role: {
@@ -102,25 +112,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
         createdAt: new Date().toISOString()
       });
-
-      toast.success('Account created successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Signup error:', error);
-      toast.error('Failed to create account');
-      throw error;
+      throw new Error(getErrorMessage(error.code));
     }
   };
 
   const loginWithGoogle = async () => {
     try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      
-      // Check if user document exists
+      const result = await signInWithPopup(auth, googleProvider);
       const userDoc = await getDoc(doc(db, 'users', result.user.uid));
       
       if (!userDoc.exists()) {
-        // Create new user document for Google sign-in
         await setDoc(doc(db, 'users', result.user.uid), {
           email: result.user.email,
           displayName: result.user.displayName,
@@ -134,44 +137,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
 
-      toast.success('Successfully signed in with Google!');
-    } catch (error) {
+      // Force refresh the token to ensure we have the latest claims
+      await result.user.getIdToken(true);
+      
+    } catch (error: any) {
       console.error('Google sign-in error:', error);
-      toast.error('Failed to sign in with Google');
-      throw error;
+      if (error.code === 'auth/popup-blocked') {
+        // If popup is blocked, try redirect method instead
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        } catch (redirectError: any) {
+          throw new Error(getErrorMessage(redirectError.code));
+        }
+      }
+      throw new Error(getErrorMessage(error.code));
     }
   };
 
   const logout = async () => {
     try {
       await signOut(auth);
-      toast.success('Successfully logged out');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Logout error:', error);
-      toast.error('Failed to log out');
-      throw error;
+      throw new Error(getErrorMessage(error.code));
     }
   };
 
   const resetPassword = async (email: string) => {
     try {
       await sendPasswordResetEmail(auth, email);
-      toast.success('Password reset email sent');
-    } catch (error) {
-      console.error('Reset password error:', error);
-      toast.error('Failed to send reset email');
-      throw error;
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      throw new Error(getErrorMessage(error.code));
     }
   };
 
   const updateUserRole = async (userId: string, role: User['role']) => {
     try {
       await setDoc(doc(db, 'users', userId), { role }, { merge: true });
-      toast.success('User role updated successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Update role error:', error);
-      toast.error('Failed to update user role');
-      throw error;
+      throw new Error('Failed to update user role');
+    }
+  };
+
+  const getErrorMessage = (errorCode: string): string => {
+    switch (errorCode) {
+      case 'auth/invalid-credential':
+        return 'Invalid email or password';
+      case 'auth/user-not-found':
+        return 'No account found with this email';
+      case 'auth/wrong-password':
+        return 'Incorrect password';
+      case 'auth/email-already-in-use':
+        return 'Email is already in use';
+      case 'auth/weak-password':
+        return 'Password is too weak';
+      case 'auth/invalid-email':
+        return 'Invalid email address';
+      case 'auth/popup-closed-by-user':
+        return 'Sign-in window was closed';
+      case 'auth/popup-blocked':
+        return 'Sign-in popup was blocked by your browser';
+      case 'auth/cancelled-popup-request':
+        return 'Sign-in was cancelled';
+      case 'auth/network-request-failed':
+        return 'Network error. Please check your connection';
+      case 'auth/too-many-requests':
+        return 'Too many attempts. Please try again later';
+      default:
+        return 'An error occurred during authentication';
     }
   };
 
