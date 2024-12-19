@@ -16,22 +16,65 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+  console.log('Firebase initialized successfully');
+} catch (error) {
+  console.error('Error initializing Firebase:', error);
+  throw error;
+}
 
 // Initialize services
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
+let auth;
+try {
+  auth = getAuth(app);
+  console.log('Firebase Auth initialized');
+} catch (error) {
+  console.error('Error initializing Auth:', error);
+  throw error;
+}
+
+let db;
+try {
+  db = getFirestore(app);
+  console.log('Firestore initialized');
+} catch (error) {
+  console.error('Error initializing Firestore:', error);
+  throw error;
+}
+
+let storage;
+try {
+  storage = getStorage(app);
+  console.log('Storage initialized');
+} catch (error) {
+  console.error('Error initializing Storage:', error);
+  throw error;
+}
 
 // Initialize Analytics conditionally
 let analytics = null;
-isSupported().then(yes => yes && (analytics = getAnalytics(app)))
-  .catch(e => console.log('Analytics not supported:', e));
+isSupported()
+  .then(yes => {
+    if (yes) {
+      analytics = getAnalytics(app);
+      console.log('Analytics initialized');
+    } else {
+      console.log('Analytics not supported in this environment');
+    }
+  })
+  .catch(error => {
+    console.error('Error checking analytics support:', error);
+  });
 
 // Set persistence to LOCAL
 setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log('Auth persistence set to LOCAL');
+  })
   .catch((error) => {
-    console.error('[Firebase] Persistence error:', error);
+    console.error('Error setting auth persistence:', error);
   });
 
 // Export initialized services

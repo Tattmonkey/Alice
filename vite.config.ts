@@ -15,6 +15,7 @@ export default defineConfig(({ command, mode }) => {
       }
     },
     define: {
+      'process.env': env,
       __FIREBASE_CONFIG__: {
         apiKey: env.VITE_FIREBASE_API_KEY,
         authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -39,12 +40,12 @@ export default defineConfig(({ command, mode }) => {
     },
     build: {
       outDir: 'dist',
-      sourcemap: mode !== 'production',
+      sourcemap: true,
       rollupOptions: {
         output: {
           manualChunks: {
             'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-            'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
+            'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/analytics'],
             'ui-vendor': ['@headlessui/react', 'framer-motion', 'lucide-react', 'recharts'],
             'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod']
           }
