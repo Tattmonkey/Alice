@@ -1,43 +1,26 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  User as FirebaseUser,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  sendPasswordResetEmail,
-  signInWithPopup,
-  GoogleAuthProvider
-} from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { toast } from 'react-toastify';
+import { User, UserRole, UserPreferences } from '../types';
+import toast from 'react-hot-toast';
 
-interface User extends FirebaseUser {
-  role?: {
-    type: 'user' | 'artist' | 'admin';
-    verified: boolean;
-    createdAt: string;
-  };
-  displayName: string | null;
-  email: string | null;
-  photoURL: string | null;
-}
+const ADMIN_EMAILS = ['washington@alicetattoos.com', 'support@alicetattoos.com'];
 
 interface AuthContextType {
-  currentUser: User | null;
+  user: User | null;
+  isAdmin: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
-  updateUserRole: (userId: string, role: User['role']) => Promise<void>;
+  convertToUser: () => Promise<void>;
+  convertToArtist: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const useAuth = () => {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
@@ -45,31 +28,99 @@ const useAuth = () => {
   return context;
 };
 
-const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+async function createOrGetUser(firebaseUser: FirebaseUser) {
+  const isAdminUser = ADMIN_EMAILS.includes(firebaseUser.email || '');
+  const userRef = doc(db, 'users', firebaseUser.uid);
+  const userDoc = await getDoc(userRef);
+
+  if (userDoc.exists()) {
+    const userData = userDoc.data();
+    const userRole: UserRole = {
+      type: (userData.role?.type as 'user' | 'artist' | 'admin') || (isAdminUser ? 'admin' : 'user')
+    };
+
+    const userPreferences: UserPreferences = {
+      notifications: {
+        email: true,
+        push: true,
+        bookingUpdates: true,
+        marketingEmails: false
+      },
+      theme: 'light',
+      language: 'en'
+    };
+
+    return {
+      user: {
+        id: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        name: userData.name || firebaseUser.displayName || 'User',
+        role: userRole,
+        credits: userData.credits || 0,
+        profileImage: userData.profileImage || firebaseUser.photoURL,
+        createdAt: userData.createdAt ? new Date(userData.createdAt) : new Date(),
+        updatedAt: new Date(),
+        lastLoginAt: new Date(),
+        isEmailVerified: firebaseUser.emailVerified,
+        preferences: userData.preferences || userPreferences
+      } as User,
+      isAdmin: isAdminUser
+    };
+  }
+
+  // Create new user document
+  const userRole: UserRole = {
+    type: isAdminUser ? 'admin' : 'user'
+  };
+
+  const userPreferences: UserPreferences = {
+    notifications: {
+      email: true,
+      push: true,
+      bookingUpdates: true,
+      marketingEmails: false
+    },
+    theme: 'light',
+    language: 'en'
+  };
+
+  const newUser: User = {
+    id: firebaseUser.uid,
+    email: firebaseUser.email || '',
+    name: firebaseUser.displayName || 'User',
+    role: userRole,
+    credits: 0,
+    profileImage: firebaseUser.photoURL || undefined,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastLoginAt: new Date(),
+    isEmailVerified: firebaseUser.emailVerified,
+    preferences: userPreferences
+  };
+
+  await setDoc(userRef, newUser);
+  return { user: newUser, isAdmin: isAdminUser };
+}
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
         try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          const userData = userDoc.data();
-          
-          setCurrentUser({
-            ...user,
-            role: userData?.role || {
-              type: 'user',
-              verified: false,
-              createdAt: new Date().toISOString()
-            }
-          } as User);
+          const { user, isAdmin } = await createOrGetUser(firebaseUser);
+          setUser(user);
+          setIsAdmin(isAdmin);
         } catch (error) {
-          console.error('Error fetching user data:', error);
+          console.error('Error setting up user:', error);
           toast.error('Error loading user data');
         }
       } else {
-        setCurrentUser(null);
+        setUser(null);
+        setIsAdmin(false);
       }
       setLoading(false);
     });
@@ -79,34 +130,14 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   const login = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const { user, isAdmin } = await createOrGetUser(result.user);
+      setUser(user);
+      setIsAdmin(isAdmin);
       toast.success('Successfully logged in!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
-      toast.error('Failed to log in');
-      throw error;
-    }
-  };
-
-  const signup = async (email: string, password: string) => {
-    try {
-      const result = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Create user document
-      await setDoc(doc(db, 'users', result.user.uid), {
-        email: result.user.email,
-        role: {
-          type: 'user',
-          verified: false,
-          createdAt: new Date().toISOString()
-        },
-        createdAt: new Date().toISOString()
-      });
-
-      toast.success('Account created successfully!');
-    } catch (error) {
-      console.error('Signup error:', error);
-      toast.error('Failed to create account');
+      toast.error(error.message || 'Failed to log in');
       throw error;
     }
   };
@@ -114,30 +145,16 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const loginWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
+      provider.addScope('profile');
+      provider.addScope('email');
       const result = await signInWithPopup(auth, provider);
-      
-      // Check if user document exists
-      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
-      
-      if (!userDoc.exists()) {
-        // Create new user document for Google sign-in
-        await setDoc(doc(db, 'users', result.user.uid), {
-          email: result.user.email,
-          displayName: result.user.displayName,
-          photoURL: result.user.photoURL,
-          role: {
-            type: 'user',
-            verified: false,
-            createdAt: new Date().toISOString()
-          },
-          createdAt: new Date().toISOString()
-        });
-      }
-
+      const { user, isAdmin } = await createOrGetUser(result.user);
+      setUser(user);
+      setIsAdmin(isAdmin);
       toast.success('Successfully signed in with Google!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Google sign-in error:', error);
-      toast.error('Failed to sign in with Google');
+      toast.error(error.message || 'Failed to sign in with Google');
       throw error;
     }
   };
@@ -145,45 +162,67 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const logout = async () => {
     try {
       await signOut(auth);
+      setUser(null);
+      setIsAdmin(false);
       toast.success('Successfully logged out');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Logout error:', error);
-      toast.error('Failed to log out');
+      toast.error(error.message || 'Failed to log out');
       throw error;
     }
   };
 
-  const resetPassword = async (email: string) => {
+  const convertToUser = async () => {
+    if (!user) {
+      toast.error('No user logged in');
+      return;
+    }
+
     try {
-      await sendPasswordResetEmail(auth, email);
-      toast.success('Password reset email sent');
-    } catch (error) {
-      console.error('Reset password error:', error);
-      toast.error('Failed to send reset email');
+      const userRef = doc(db, 'users', user.id);
+      const newRole: UserRole = {
+        type: 'user'
+      };
+      await updateDoc(userRef, { role: newRole });
+      setUser(prev => prev ? { ...prev, role: newRole } : null);
+      toast.success('Successfully converted to user');
+    } catch (error: any) {
+      console.error('Error converting to user:', error);
+      toast.error(error.message || 'Failed to convert to user');
       throw error;
     }
   };
 
-  const updateUserRole = async (userId: string, role: User['role']) => {
+  const convertToArtist = async () => {
+    if (!user) {
+      toast.error('No user logged in');
+      return;
+    }
+
     try {
-      await setDoc(doc(db, 'users', userId), { role }, { merge: true });
-      toast.success('User role updated successfully');
-    } catch (error) {
-      console.error('Update role error:', error);
-      toast.error('Failed to update user role');
+      const userRef = doc(db, 'users', user.id);
+      const newRole: UserRole = {
+        type: 'artist'
+      };
+      await updateDoc(userRef, { role: newRole });
+      setUser(prev => prev ? { ...prev, role: newRole } : null);
+      toast.success('Successfully converted to artist');
+    } catch (error: any) {
+      console.error('Error converting to artist:', error);
+      toast.error(error.message || 'Failed to convert to artist');
       throw error;
     }
   };
 
   const value = {
-    currentUser,
+    user,
+    isAdmin,
     loading,
     login,
-    signup,
     loginWithGoogle,
     logout,
-    resetPassword,
-    updateUserRole
+    convertToUser,
+    convertToArtist
   };
 
   return (
@@ -192,5 +231,3 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     </AuthContext.Provider>
   );
 };
-
-export { AuthContext, useAuth, AuthProvider };
