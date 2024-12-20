@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { Mail, Lock, LogIn, Loader2, AlertTriangle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -16,6 +16,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function LoginForm() {
+  const navigate = useNavigate();
   const { login, loginWithGoogle } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
@@ -25,8 +26,10 @@ export default function LoginForm() {
   const onSubmit = async (data: FormData) => {
     try {
       await login(data.email, data.password);
-    } catch (error) {
-      console.error(error);
+      navigate('/dashboard');
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast.error(error?.message || 'Failed to log in');
     }
   };
 
@@ -36,7 +39,7 @@ export default function LoginForm() {
     try {
       setGoogleLoading(true);
       await loginWithGoogle();
-      toast.success('Successfully signed in with Google');
+      navigate('/dashboard');
     } catch (error: any) {
       console.error('Google sign in error:', error);
       if (error.code === 'auth/popup-blocked') {
@@ -56,7 +59,7 @@ export default function LoginForm() {
     } finally {
       setGoogleLoading(false);
     }
-  }, [googleLoading, loginWithGoogle]);
+  }, [googleLoading, loginWithGoogle, navigate]);
 
   return (
     <div className="max-w-md w-full space-y-8">
